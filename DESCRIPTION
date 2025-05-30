@@ -1,0 +1,29 @@
+Package: ccar3
+Title: Canonical Correlation Analysis via Reduced Rank Regression
+Version: 0.0.0.9000
+Authors@R: 
+    person("Claire", "Donnat", , "cdonnat@uchicago.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: Functions for performing canonical correlation analysis via reduced-rank regression with support for regularization and cross-validation.
+Depends: R (>= 3.5.0)
+Imports:
+  dplyr,
+  tidyr,
+  Matrix,
+  glmnet,
+  gglasso,
+  rrpack,
+  foreach,
+  doParallel,
+  corpcor,
+  CVXR,
+  caret,
+  purrr
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+LazyData: true
