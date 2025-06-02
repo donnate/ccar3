@@ -7,18 +7,23 @@ Authors@R:
 Description: Functions for performing canonical correlation analysis via reduced-rank regression with support for regularization and cross-validation.
 Depends: R (>= 3.5.0)
 Imports:
-  dplyr,
-  tidyr,
+  tidyverse,
   Matrix,
   glmnet,
-  gglasso,
   rrpack,
   foreach,
+  pracma,
+  CCA,
+  PMA,
+  MASS,
   doParallel,
   corpcor,
   CVXR,
-  caret,
-  purrr
+  crayon,
+  SMUT,
+  matrixStats,
+  rARPACK,
+  caret
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

@@ -25,13 +25,7 @@ Witten.CV(
 \item{lambday}{Vector of sparsity parameters for Y (default is a sequence from 0 to 1 with step 0.1)}
 }
 \value{
-A list with elements:
-\describe{
-\item{U}{Canonical direction matrix for X (p x r)}
-\item{V}{Canonical direction matrix for Y (q x r)}
-\item{loss}{Mean squared error of prediction}
-\item{cor}{Canonical covariances}
-}
+the appropriate levels of regularisation
 }
 \description{
 Sparse CCA by Witten and Tibshirani (2009)
