@@ -30,7 +30,7 @@ soft_thresh2 <- function(A, lambda){
 }
 
 matmul = function(A, B){
-  eigenMapMatMult(A, B)
+  SMUT::eigenMapMatMult(A, B)
 }
 
 rmat = function(n, p){

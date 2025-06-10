@@ -239,8 +239,8 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
     cancors[,i.r]<-abs(cor(ksi,omega))
 
     # Residual matrices
-    gammahat<-matrix(ginv(t(ksi)%*%ksi)%*%t(ksi)%*%X_data,ncol=1)
-    thetahat<-matrix(ginv(t(omega)%*%omega)%*%t(omega)%*%Y_data,ncol=1)
+    gammahat<-matrix(MASS::ginv(t(ksi)%*%ksi)%*%t(ksi)%*%X_data,ncol=1)
+    thetahat<-matrix(MASS::ginv(t(omega)%*%omega)%*%t(omega)%*%Y_data,ncol=1)
 
     X_data<-X_data-ksi%*%t(gammahat)
     Y_data<-Y_data-omega%*%t(thetahat)
