@@ -133,8 +133,8 @@ ecca = function(X, Y, lambda = 0, groups = NULL, r = 2,
         if(fnorm(B0) > 0) delta = fnorm(B - B0)^2 / fnorm(B0)^2
         if(verbose && iter %% 10 == 0) cat("\niter:", iter, "fnorm:", fnorm(B0), "delta:", delta)
     }
-    if(iter >= maxiter) cat(red("     ADMM did not converge!"))
-    else cat(paste0(green("     ADMM converged in ", iter, " iterations")))
+    if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
+    else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
 
     # Step 2: map back
 
@@ -237,8 +237,8 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,
       if(fnorm(B0) > 0) delta = fnorm(B - B0)^2 / fnorm(B0)^2
       if(verbose && iter %% 10 == 0) cat("\niter:", iter, "fnorm:", fnorm(B0), "delta:", delta)
     }
-    if(iter >= maxiter) cat(red("     ADMM did not converge!"))
-    else cat(paste0(green("     ADMM converged in ", iter, " iterations")))
+    if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
+    else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
     
     # Step 2: map back
     
