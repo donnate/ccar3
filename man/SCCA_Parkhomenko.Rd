@@ -11,7 +11,8 @@ SCCA_Parkhomenko(
   n.cv = 5,
   lambda.v.seq = seq(0, 0.2, by = 0.02),
   lambda.u.seq = seq(0, 0.2, by = 0.02),
-  Krank = 1
+  Krank = 1,
+  standardize = TRUE
 )
 }
 \arguments{

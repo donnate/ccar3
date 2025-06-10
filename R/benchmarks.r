@@ -11,7 +11,7 @@ library(PMA)
 #' @param Y_train  Matrix of responses (n x q)
 #' @param S Optional covariance matrix (default is NULL, which computes it from X_train and Y_train)
 #' @param rank Target rank for the CCA (default is 2)
-#' @param method.type Type of method to use for Sparse CCA (default is "FIT_SAR_BIC")
+#' @param method.type Type of method to use for Sparse CCA (default is "FIT_SAR_CV"). Choices include "FIT_SAR_BIC", "FIT_SAR_CV", "Witten_Perm", "Witten.CV", "Waaijenborg-Author", "Waaijenborg-CV", and "SCCA_Parkhomenko".
 #' @param kfolds Number of cross-validation folds (default is 5)
 #' @param lambdax Vector of sparsity parameters for X (default is a sequence from 0 to 1 with step 0.1)
 #' @param lambday Vector of sparsity parameters for Y (default is a sequence from 0 to 1 with step 0.1)
@@ -21,9 +21,10 @@ library(PMA)
 #' @return A matrix (p+q)x r containing the canonical directions for X and Y.
 #' @export
 sparse_CCA_benchmarks <- function(X_train, Y_train, S=NULL, 
-                              rank=2, kfolds=5, method.type="FIT_SAR_BIC",
+                              rank=2, kfolds=5, method.type="FIT_SAR_CV",
                               lambdax = 10^seq(from=-3,to=2,length=10),
-                              lambday = c(0, 1e-7, 1e-6, 1e-5)){
+                              lambday = c(0, 1e-7, 1e-6, 1e-5),
+                              standardize = TRUE){
 
   X_train = as.matrix(data.frame(X_train) %>% mutate_all(~replace_na(., mean(., na.rm = TRUE))))
   Y_train = as.matrix(data.frame(Y_train) %>% mutate_all(~replace_na(., mean(., na.rm = TRUE))))
@@ -41,7 +42,8 @@ sparse_CCA_benchmarks <- function(X_train, Y_train, S=NULL,
                            lambdaAseq=lambdax,
                            lambdaBseq=lambday,
                            max.iter=100, conv=10^-2,
-                           selection.criterion=1, n.cv=kfolds)
+                           selection.criterion=1, n.cv=kfolds,
+                           standardize=standardize)
     a_estimate = rbind(method$uhat, method$vhat)
     
   }
@@ -50,7 +52,8 @@ sparse_CCA_benchmarks <- function(X_train, Y_train, S=NULL,
                           lambdaAseq=lambdax,
                           lambdaBseq=lambday,
                           max.iter=100,conv=10^-2, selection.criterion=2, 
-                          n.cv=kfolds)
+                          n.cv=kfolds,
+                          standardize=standardize)
     a_estimate = rbind(method$uhat, method$vhat)
     
   }
@@ -59,19 +62,22 @@ sparse_CCA_benchmarks <- function(X_train, Y_train, S=NULL,
                                typex="standard",typez="standard", 
                                penaltyxs =lambdax[which(lambdax < 1)],
                                penaltyzs = lambday[which(lambday < 1)],
+                               standardize = standardize,
                                nperms=50)
     
     method<-PMA::CCA(x=X_train, z=Y_train, typex="standard",typez="standard",K=rank,
-                         penaltyx=Witten_Perm$bestpenaltyx,penaltyz=Witten_Perm$bestpenaltyz,trace=FALSE)
+                         penaltyx=Witten_Perm$bestpenaltyx,penaltyz=Witten_Perm$bestpenaltyz,trace=FALSE,
+                         standardize = standardize)
     a_estimate = rbind(method$u, method$v)
   }
   if(method.type=="Witten.CV"){
     Witten_CV<-Witten.CV(X=X_train,Y=Y_train, n.cv=5,lambdax=lambdax[which(lambdax < 1)],
-                         lambday=c(lambday[which(lambday < 1)]))
+                         lambday=lambdax[which(lambdax < 1)])
     
     method <-PMA::CCA(x=X_train,z=Y_train,typex="standard",typez="standard",
                  K=rank,penaltyx=Witten_CV$lambdax.opt,
-                 penaltyz=Witten_CV$lambday.opt,trace=FALSE)
+                 penaltyz=Witten_CV$lambday.opt,trace=FALSE,
+                 standardize = standardize)
     a_estimate = rbind(method$u, method$v)
     
   }
@@ -79,7 +85,8 @@ sparse_CCA_benchmarks <- function(X_train, Y_train, S=NULL,
     method<-Waaijenborg(X=X_train,Y=Y_train,
                         lambdaxseq=lambdax,
                         lambdayseq=lambday,
-                        rank=rank,selection.criterion=1)
+                        rank=rank,selection.criterion=1,
+                        standardize = standardize)
     a_estimate = rbind(method$vhat, method$uhat)
     
   }
@@ -87,24 +94,17 @@ sparse_CCA_benchmarks <- function(X_train, Y_train, S=NULL,
     method<-Waaijenborg(X=X_train,
                         Y=Y_train,lambdaxseq=lambdax,
                         lambdayseq=lambday,
-                        rank=rank, selection.criterion=2)
+                        rank=rank, selection.criterion=2,
+                        standardize = standardize)
     a_estimate = rbind(method$vhat, method$uhat)
     
   }
   if(method.type=="SCCA_Parkhomenko"){
     method<- SCCA_Parkhomenko(x.data=X_train, y.data=Y_train, Krank=rank,
                               lambda.v.seq = lambdax[which(lambdax < 2)],
-                              lambda.u.seq = lambday[which(lambday < 2)])
+                              lambda.u.seq = lambday[which(lambday < 2)],
+                              standardize = standardize)
     a_estimate = rbind(method$uhat, method$vhat)
-    
-  }
-  if(method.type=="Canonical Ridge-Author"){
-    RCC_cv<-estim.regul_crossvalidation(X_train,Y_train,n.cv=5, 
-                                        lambda1grid=lambdax[which(lambdax < 1)],
-                                        lambda2grid=lambday[which(lambdax < 1)])
-    method<-rcc(X_train,Y_train, RCC_cv$lambda1.optim, RCC_cv$lambda2.optim)
-    a_estimate = rbind(method$xcoef[,1:rank], method$ycoef[,1:rank])
-    
     
   }
   a_estimate <- gca_to_cca(a_estimate, S, pp)

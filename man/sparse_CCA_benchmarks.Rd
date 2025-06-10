@@ -10,9 +10,10 @@ sparse_CCA_benchmarks(
   S = NULL,
   rank = 2,
   kfolds = 5,
-  method.type = "FIT_SAR_BIC",
+  method.type = "FIT_SAR_CV",
   lambdax = 10^seq(from = -3, to = 2, length = 10),
-  lambday = c(0, 1e-07, 1e-06, 1e-05)
+  lambday = c(0, 1e-07, 1e-06, 1e-05),
+  standardize = TRUE
 )
 }
 \arguments{
@@ -26,7 +27,7 @@ sparse_CCA_benchmarks(
 
 \item{kfolds}{Number of cross-validation folds (default is 5)}
 
-\item{method.type}{Type of method to use for Sparse CCA (default is "FIT_SAR_BIC")}
+\item{method.type}{Type of method to use for Sparse CCA (default is "FIT_SAR_CV"). Choices include "FIT_SAR_BIC", "FIT_SAR_CV", "Witten_Perm", "Witten.CV", "Waaijenborg-Author", "Waaijenborg-CV", and "SCCA_Parkhomenko".}
 
 \item{lambdax}{Vector of sparsity parameters for X (default is a sequence from 0 to 1 with step 0.1)}
 

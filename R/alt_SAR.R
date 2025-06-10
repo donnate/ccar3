@@ -29,7 +29,7 @@ library(CCA)
 SparseCCA <- function(X, Y, lambdaAseq=seq(from=1, to=0.01, by=-0.01),
                     lambdaBseq=seq(from=1, to=0.01, by=-0.01),
                     rank, selection.criterion=1, n.cv=5, A.initial=NULL,
-                    B.initial=NULL, max.iter=20, conv=10^-2){
+                    B.initial=NULL, max.iter=20, conv=10^-2, standardize=TRUE){
   ### Function to perform Sparse Canonical Correlation Analysis using alternating regressions
 
   ### INPUT
@@ -70,6 +70,10 @@ SparseCCA <- function(X, Y, lambdaAseq=seq(from=1, to=0.01, by=-0.01),
 
 
   ### START CODE
+  if (standardize){
+    X = scale(X, center = TRUE, scale=TRUE)
+    Y = scale(Y, center = TRUE, scale=TRUE)
+  }
 
   # Starting Values: Canonical Ridge Solution
   if(is.null(A.initial)){
@@ -220,7 +224,8 @@ alternating.regression <- function(Xreg, Yreg,
 
 
   ##Standardize
-  Xreg_st <- matrix(stdize(Xreg), ncol=ncol(Xreg))
+  Xreg = scale(Xreg, center = TRUE, scale=TRUE)
+  Xreg_st <- matrix(Xreg, ncol=ncol(Xreg))
   for (i.variable in 1:ncol(Xreg)){
     if (is.na(apply(Xreg_st, 2, sum)[i.variable])==T) {
       Xreg_st[, i.variable] <- 0}
@@ -280,6 +285,8 @@ alternating.regression <- function(Xreg, Yreg,
 
 NORMALIZATION_UNIT <- function(U){
   ### Normalize a vector U to have norm one
+  if (is.null(dim(U))) U <- matrix(U, ncol = 1)
+
 
   length.U <- as.numeric(sqrt(t(U)%*%U))
   if(length.U==0){length.U <- 1}
@@ -296,6 +303,8 @@ BIC <- function(U, Y.data, X.data){
 
 testsample.correlation <- function(U, Xdata, yscore){
   ### Calculate correlation in test sample
+  if (is.null(dim(U))) U <- matrix(U, ncol = 1)
+
   xscore = Xdata%*%U
   if (all(U==0)) {
     return(0)
@@ -311,6 +320,8 @@ testsample.correlation <- function(U, Xdata, yscore){
 
 estim.regul_crossvalidation <- function (X,  Y,  lambda1grid = NULL,
                                          lambda2grid = NULL, n.cv=5){
+
+  
   
   if (is.null(lambda1grid)) {
     lambda1grid <- seq(0.001, 1, length = 5)
@@ -378,3 +389,4 @@ cvfunction <- function(U, n, Xmatrix, Ymatrix, lambda1, lambda2, ncvsample){
   cv <-  cv + abs(cor(xscore, yscore, use="pairwise"))
   return(cv)
 }
+

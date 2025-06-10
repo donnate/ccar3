@@ -24,10 +24,13 @@ library(pls)
 #' @export
 Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
                       lambdayseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1), rank,
-                      selection.criterion=1,n.cv=5,max.iter=20,conv=10^-3){
+                      selection.criterion=1,n.cv=5,max.iter=20,conv=10^-3, standardize=TRUE){
   ### Function to perform Sparse CCA based on Waaijenborg et al. (2008)
   # REFERENCE Waaijenborg et al. (2008), "Quantifying the Association between Gene Expressions and DNA-Markers by Penalized Canonical Correlation Analysis" in Statistical Applications in Genetics and Molecular Biology, Volume 7, Issue 1, Article 3
-
+  if (standardize){
+    X = scale(X, center = TRUE, scale=TRUE)
+    Y = scale(Y, center = TRUE, scale=TRUE)
+  }
   ### STORE RESULTS
   lambdaxseq=matrix(lambdaxseq,nrow=1)
   lambdayseq=matrix(lambdayseq,nrow=1)
@@ -92,7 +95,7 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
       
       # Estimate canonical vector u
       U.hat<-apply(lambdayseq,2,UST,a=t(ksi)%*%Y_data_st)
-      U.hat.reduced<-U.hat[,which(apply(U.hat,2,sum)!=0)]
+      U.hat.reduced<- U.hat[,which(apply(U.hat,2,sum)!=0), drop = FALSE]
       lambday.reduced<-matrix(lambdayseq[which(apply(U.hat,2,sum)!=0)],nrow=1)
       
       # Select tuning parameter
@@ -117,9 +120,9 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
             if (is.null(dim(U.hat.reduced))){
               U.hat.reduced = matrix(U.hat.reduced, ncol=1)
             }
-            U.hat.final<-matrix(U.hat.reduced[,min(which.min(CVscore.mean))],ncol=1) # OPTIMAL SOLUTION
-            U.hat.final<-apply(U.hat.final,2,NORMALIZATION_UNIT)
-            lambday_ALL[it,i.r]<-lambday.reduced[min(which.min(CVscore.mean))]
+            U.hat.final<- U.hat.reduced[,min(which.max(CVscore.mean)), drop = FALSE] # OPTIMAL SOLUTION
+            U.hat.final<-apply(U.hat.final,2, NORMALIZATION_UNIT)
+            lambday_ALL[it,i.r]<-lambday.reduced[min(which.max(CVscore.mean))]
         
       } else {
             if (selection.criterion==2){ #Maximize test sample correlation
@@ -142,7 +145,7 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
                   if (is.null(dim(U.hat.reduced))){
                     U.hat.reduced = matrix(U.hat.reduced, ncol=1)
                   }
-                  U.hat.final<-matrix(U.hat.reduced[,min(which.max(CVscore.mean))],ncol=1) # OPTIMAL SOLUTION
+                  U.hat.final<-U.hat.reduced[, min(which.max(CVscore.mean)), drop = FALSE] # OPTIMAL SOLUTION
                   U.hat.final<-apply(U.hat.final,2,NORMALIZATION_UNIT)
                   lambday_ALL[it,i.r]<-lambday.reduced[min(which.max(CVscore.mean))]
             } else {
@@ -154,7 +157,7 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
       
       # Estimate canonical vector v
       V.hat<-apply(lambdaxseq,2,UST,a=t(omega)%*%X_data_st)
-      V.hat.reduced<-V.hat[,which(apply(V.hat,2,sum)!=0)]
+      V.hat.reduced<-V.hat[,which(apply(V.hat,2,sum)!=0), drop = FALSE]
       lambdax.reduced<-matrix(lambdaxseq[which(apply(V.hat,2,sum)!=0)],nrow=1)
       
       # Select tuning parameter
@@ -179,9 +182,9 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
               if (is.null(dim(V.hat.reduced))){
                 V.hat.reduced = matrix(V.hat.reduced, ncol=1)
               }
-              V.hat.final<-matrix(V.hat.reduced[,min(which.min(CVscore.mean))],ncol=1) # OPTIMAL SOLUTION
+              V.hat.final<-V.hat.reduced[,min(which.max(CVscore.mean)), drop = FALSE]# OPTIMAL SOLUTION
               V.hat.final<-apply(V.hat.final,2,NORMALIZATION_UNIT)
-              lambdax_ALL[it,i.r]<-lambdax.reduced[min(which.min(CVscore.mean))]
+              lambdax_ALL[it,i.r]<-lambdax.reduced[min(which.max(CVscore.mean))]
         } else {
               if (selection.criterion==2){
                 n = nrow(X_data_st)
@@ -204,9 +207,9 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
                 if (is.null(dim(V.hat.reduced))){
                   V.hat.reduced = matrix(V.hat.reduced, ncol=1)
                 }
-                V.hat.final<-matrix(V.hat.reduced[,min(which.max(CVscore.mean))],ncol=1) # OPTIMAL SOLUTION
+                V.hat.final<-matrix(V.hat.reduced[,min(which.max(CVscore.mean)), drop = FALSE],ncol=1) # OPTIMAL SOLUTION
                 V.hat.final<-apply(V.hat.final,2,NORMALIZATION_UNIT)
-                lambdax_ALL[it,i.r]<-lambdax.reduced[min(which.min(CVscore.mean))]
+                lambdax_ALL[it,i.r]<-lambdax.reduced[min(which.max(CVscore.mean))]
               } else {
                 stop("selection.criterion needs to be equal to 1 (Difference test and training correlation) or 2 (Test correlation)")
               }
@@ -251,6 +254,7 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
 }
 
 UST<-function(a,U){ # Univariate Soft Thresholding
+
   matrix((abs(a)-U/2 + abs(abs(a)-U/2))/2*sign(a),ncol=1)
 }
 

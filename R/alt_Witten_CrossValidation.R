@@ -14,12 +14,20 @@ library(PMA)
 Witten.CV<-function(X,Y,n.cv=5,
                     rank,
                     lambdax=matrix(seq(from=0,to=1,by=0.1),nrow=1),
-                    lambday=matrix(seq(from=0,to=1,by=0.1),nrow=1)){ 
+                    lambday=matrix(seq(from=0,to=1,by=0.1),nrow=1),
+                    standardize = TRUE){ 
+
+
   n = nrow(X)
   n.cv.sample<-trunc(n/n.cv)
   whole.sample<-seq(1,n)
   lambdax=matrix(lambdax,nrow=1)
   lambday=matrix(lambday,nrow=1)
+
+  if (standardize){
+    X = scale(X, center = TRUE, scale=TRUE)
+    Y = scale(Y, center = TRUE, scale=TRUE)
+  }
   
   cvscore<-array(NA,c(length(lambday),length(lambdax),n.cv)) #lambdax in columns, lambday in rows
 

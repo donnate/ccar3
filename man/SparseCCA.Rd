@@ -16,7 +16,8 @@ SparseCCA(
   A.initial = NULL,
   B.initial = NULL,
   max.iter = 20,
-  conv = 10^-2
+  conv = 10^-2,
+  standardize = TRUE
 )
 }
 \arguments{

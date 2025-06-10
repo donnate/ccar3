@@ -14,7 +14,8 @@ Waaijenborg(
   selection.criterion = 1,
   n.cv = 5,
   max.iter = 20,
-  conv = 10^-3
+  conv = 10^-3,
+  standardize = TRUE
 )
 }
 \arguments{

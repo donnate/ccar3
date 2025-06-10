@@ -154,12 +154,14 @@ ecca = function(X, Y, lambda = 0, groups = NULL, r = 2,
     if(max(L0) > 1e-8){
         U = matmul(matmul(matmul(B, Sy12),V0), diag(1 / L0, nrow = length(L0)))
         V = matmul(matmul(matmul(t(B), Sx12), U0), diag(1 / L0, nrow = length(L0)))
+        return(list(U = U, V = V, loss = mean(apply((X %*% U - Y %*% V)^2,2,sum)), cor = diag(t(U) %*% matmul(Sxy, V))))
     } else{
         U = matrix(NA, p, r)
         V = matrix(NA, q, r)
+        return(list(U = U, V = V, loss = mean(apply((X %*% U - Y %*% V)^2,2,sum)), cor = rep(0, r)))
     }
+
     
-    return(list(U = U, V = V, loss = mean(apply((X %*% U - Y %*% V)^2,2,sum)), cor = diag(t(U) %*% matmul(Sxy, V))))
 }
 
 
@@ -274,7 +276,7 @@ ecca.eval = function(X, Y, lambdas = 0, groups = NULL, r = 2,
   n = nrow(X)
   
   ## Create folds
-  set.seed(0)
+  set.seed(1234)
   folds = createFolds(1:n, k = nfold, list = T)
   
   ## Choose penalty lambda
@@ -284,7 +286,7 @@ ecca.eval = function(X, Y, lambdas = 0, groups = NULL, r = 2,
       if(parallel){
         registerDoParallel(makeCluster(detectCores() - 2, type = "PSOCK"))
         ## Parallel cross validation
-        cv = foreach(fold = folds, .export = c("ecca", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), .packages = c("SMUT", "rARPACK", "crayon")) %dopar% {
+        cv = foreach(fold = folds, .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), .packages = c("SMUT", "rARPACK", "crayon")) %dopar% {
           
           ## Fit lasso model
           ECCA = ecca_across_lambdas(X[-fold,,drop = F], Y[-fold,,drop = F], lambdas, groups, r, rho, B0, eps, maxiter, verbose = verbose)
@@ -333,13 +335,13 @@ ecca.eval = function(X, Y, lambdas = 0, groups = NULL, r = 2,
         }
     }
     scores = data.frame(lambda = lambdas, mse = rowMeans(scores.cv), se = rowSds(scores.cv)/sqrt(nfold))
-    plt = scores %>%
-      ggplot(aes(lambda, mse))+
-      geom_point()+
-      geom_line()+
-      geom_errorbar(aes(ymin = mse - se, ymax = mse + se))+
-      theme_bw()
-    suppressWarnings(print(plt))
+    # plt = scores %>%
+    #   ggplot(aes(lambda, mse))+
+    #   geom_point()+
+    #   geom_line()+
+    #   geom_errorbar(aes(ymin = mse - se, ymax = mse + se))+
+    #   theme_bw()
+    # suppressWarnings(print(plt))
     lambda.min = scores %>% slice(which.min(mse)) %>% pull(lambda)
     upper = scores %>% slice(which.min(mse)) %>% mutate(upper = mse + se) %>% pull(upper)
     lambda.1se = scores %>% filter(mse <= upper) %>% pull(lambda) %>% max()
@@ -394,5 +396,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2,
   
   return(list(U = ECCA$U, V = ECCA$V, 
               cor = diag(t(ECCA$U) %*% matmul(t(X), Y) %*% ECCA$V), 
-              loss = mean(apply((X %*% ECCA$U - Y %*% ECCA$V)^2,2,sum))))
+              loss = mean(apply((X %*% ECCA$U - Y %*% ECCA$V)^2,2,sum)),
+              lambda.opt  = lambda.opt,
+              cv.scores = eval$scores))
 }

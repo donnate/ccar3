@@ -10,7 +10,8 @@ Witten.CV(
   n.cv = 5,
   rank,
   lambdax = matrix(seq(from = 0, to = 1, by = 0.1), nrow = 1),
-  lambday = matrix(seq(from = 0, to = 1, by = 0.1), nrow = 1)
+  lambday = matrix(seq(from = 0, to = 1, by = 0.1), nrow = 1),
+  standardize = TRUE
 )
 }
 \arguments{

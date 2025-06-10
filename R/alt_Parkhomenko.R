@@ -15,7 +15,7 @@
 #' }
 #' @export
 
-SCCA_Parkhomenko<-function(x.data,y.data,n.cv=5,lambda.v.seq=seq(0, 0.2, by=0.02), lambda.u.seq=seq(0, 0.2, by=0.02),Krank=1){
+SCCA_Parkhomenko<-function(x.data,y.data,n.cv=5,lambda.v.seq=seq(0, 0.2, by=0.02), lambda.u.seq=seq(0, 0.2, by=0.02),Krank=1, standardize=TRUE){
   ### Function to perform Sparse CCA based on Parkhomenko et al. (2009)
   # REFERENCE Parkhomenko et al. (2009), "Sparse Canonical Correlation Anlaysis with Application to Genomic Data Integration" in  Statistical Applications in Genetics and Molecular Biology, Volume 8, Issue 1, Article 1
   
@@ -38,7 +38,14 @@ SCCA_Parkhomenko<-function(x.data,y.data,n.cv=5,lambda.v.seq=seq(0, 0.2, by=0.02
   # START CODE
   
   # SCCA to obtain first pair of canonical vectors
-  SCCA_FIT_K1<-SCCA_Parkhomenko_K1(x.data=x.data,y.data=y.data,n.cv=n.cv,lambda.v.seq=lambda.v.seq, lambda.u.seq=lambda.u.seq)
+
+  if (standardize){
+    x.data <- scale(x.data, center = TRUE, scale=TRUE)
+    y.data <-  scale(y.data, center = TRUE, scale=TRUE)
+  }
+  
+  SCCA_FIT_K1 <- SCCA_Parkhomenko_K1(x.data=x.data,y.data=y.data,n.cv=n.cv,
+                                     lambda.v.seq=lambda.v.seq, lambda.u.seq=lambda.u.seq)
   
   
   if (Krank==1){ #1 canonical vector pair
@@ -201,6 +208,9 @@ SCCA_Parkhomenko_K1<-function(x.data,y.data,n.cv=5,lambda.v.seq=seq(0, 0.2, by=0
   best.predict.corr.scca <- max(abs(predict.corr.scca), na.rm=TRUE)
   best.lambda.v <- lambda.v.matrix[predict.corr.scca==best.predict.corr.scca]
   best.lambda.u <- lambda.u.matrix[predict.corr.scca==best.predict.corr.scca]  
+
+  best.lambda.u <- best.lambda.u[1]
+  best.lambda.v <- best.lambda.v[1]
   
   
   k <- sample.sigma12.function(x.data, y.data)
