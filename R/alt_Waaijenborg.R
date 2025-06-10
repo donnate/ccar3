@@ -28,8 +28,8 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
   ### Function to perform Sparse CCA based on Waaijenborg et al. (2008)
   # REFERENCE Waaijenborg et al. (2008), "Quantifying the Association between Gene Expressions and DNA-Markers by Penalized Canonical Correlation Analysis" in Statistical Applications in Genetics and Molecular Biology, Volume 7, Issue 1, Article 3
   if (standardize){
-    X = scale(X, center = TRUE, scale=TRUE)
-    Y = scale(Y, center = TRUE, scale=TRUE)
+    X <- scale(X, center = TRUE, scale=TRUE)
+    Y <- scale(Y, center = TRUE, scale=TRUE)
   }
   ### STORE RESULTS
   lambdaxseq=matrix(lambdaxseq,nrow=1)
@@ -67,14 +67,14 @@ Waaijenborg<-function(X, Y, lambdaxseq=matrix(seq(from=1,to=0,by=-0.01),nrow=1),
     u.initial<-u.starting
     v.initial<-v.starting
     
-    # STANDARDIZE DATA
-    X_data_st<-matrix(stdize(X_data),ncol=ncol(X_data))
+    # STANDARDIZE DATA (Data is already standardized as an option)
+    X_data_st<- X
     for (i.variable in 1:ncol(X_data)){
       if (is.na(apply(X_data_st,2,sum)[i.variable])==T) {
         X_data_st[,i.variable]<-0}    
     }
     
-    Y_data_st<-matrix(stdize(Y_data),ncol=ncol(Y_data))
+    Y_data_st<-Y
     for (i.variable in 1:ncol(Y_data)){
       if (is.na(apply(Y_data_st,2,sum)[i.variable])==T) {
         Y_data_st[,i.variable]<-0}    
