@@ -232,10 +232,10 @@ alternating.regression <- function(Xreg, Yreg,
   }
 
   ##LASSO FIT
-  LASSOFIT <- glmnet(y=Yreg, x=Xreg_st, family="gaussian", lambda=lambdaseq, intercept=T)
+  LASSOFIT <- glmnet::glmnet(y=Yreg, x=Xreg_st, family="gaussian", lambda=lambdaseq, intercept=T)
   if (is.integer(which(LASSOFIT$df!=0)) && length(which(LASSOFIT$df!=0)) == 0L) {
     # Smaller lambda sequence necessary
-    LASSOFIT <- glmnet(y=Yreg, x=Xreg_st, family="gaussian", intercept=T)
+    LASSOFIT <- glmnet::glmnet(y=Yreg, x=Xreg_st, family="gaussian", intercept=T)
     COEFhat <- matrix(LASSOFIT$beta[, which(LASSOFIT$df!=0)[1:length(lambdaseq)]], nrow=ncol(Xreg_st)) # estimated coefficients
     LAMBDA <- LASSOFIT$lambda[which(LASSOFIT$df!=0)[1:length(lambdaseq)]] # lambda values
   } else {
@@ -264,7 +264,7 @@ alternating.regression <- function(Xreg, Yreg,
         training.sample <- whole.sample[-(((i-1)*n.cv.sample+1):(i*n.cv.sample))]
         Xcv = X.data[training.sample,  ]
         Ycv = Y.data[training.sample,  ]
-        LASSOFIT_cv <- glmnet(y=Ycv, x=Xcv, family="gaussian", lambda=LAMBDA)
+        LASSOFIT_cv <- glmnet::glmnet(y=Ycv, x=Xcv, family="gaussian", lambda=LAMBDA)
         COEF_cv <- LASSOFIT_cv$beta
         cvscore[i, ] <- apply(COEF_cv, 2, testsample.correlation, Xdata=X.data[testing.sample,  ], yscore = Y.data[testing.sample,  ] )
       }

@@ -85,7 +85,7 @@ sparse_CCA_benchmarks <- function(X_train, Y_train, S=NULL,
     method<-Waaijenborg(X=X_train,Y=Y_train,
                         lambdaxseq=lambdax,
                         lambdayseq=lambday,
-                        rank=rank,selection.criterion=1,
+                        rank=rank, selection.criterion=1,
                         standardize = standardize)
     a_estimate = rbind(method$vhat, method$uhat)
     
