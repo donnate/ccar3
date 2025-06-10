@@ -19,7 +19,7 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                                 niter = 1e4, thresh = 1e-4,
                                 Gamma_dagger = NULL) {
   
-  folds <- createFolds(1:nrow(Y), k = kfolds, list = TRUE)
+  folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   no_cores <- detectCores() - 2
   registerDoParallel(cores = no_cores)
 

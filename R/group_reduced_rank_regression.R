@@ -159,7 +159,7 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
                                  do.scale = FALSE, LW_Sy = FALSE, solver = "ADMM", 
                                  rho = 1, niter = 1e4, thresh = 1e-4, verbose = FALSE) {
 
-  folds <- createFolds(1:nrow(Y), k = kfolds, list = TRUE)
+  folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   no_cores <- detectCores() - 2
   registerDoParallel(cores = no_cores)
 

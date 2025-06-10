@@ -277,7 +277,7 @@ ecca.eval = function(X, Y, lambdas = 0, groups = NULL, r = 2,
   
   ## Create folds
   set.seed(1234)
-  folds = createFolds(1:n, k = nfold, list = T)
+  folds = caret::createFolds(1:n, k = nfold, list = T)
   
   ## Choose penalty lambda
   results = data.frame(lambda = numeric(), mse = numeric(), se = numeric())
