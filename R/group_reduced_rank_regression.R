@@ -10,9 +10,9 @@ library(doParallel)
 library(CVXR)
 
 # Helper: ADMM-based group sparse solver
-solve_group_rrr_admm <- function(X, tilde_Y, Sx, groups, lambda, Kx, lambda_Kx, rho, niter, thresh, verbose = FALSE) {
+solve_group_rrr_admm <- function(X, tilde_Y, Sx, groups, lambda, rho, niter, thresh, verbose = FALSE) {
   p <- ncol(X); q <- ncol(tilde_Y)
-  Sx_tot <- if (!is.null(Kx)) Sx + lambda_Kx * as.matrix(Kx) else Sx
+  Sx_tot <- Sx
   prod_xy <- t(X) %*% tilde_Y / nrow(X)
   invSx <- solve(Sx_tot + rho * diag(p))
   
@@ -81,10 +81,8 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda) {
 #' @param Sx Optional covariance matrix for X; if NULL computed internally
 #' @param Sy Optional covariance matrix for Y; if NULL computed internally
 #' @param lambda Regularization parameter
-#' @param Kx Optional additional penalty matrix for X
 #' @param r Target rank
-#' @param do.scale Whether to scale variables
-#' @param lambda_Kx Regularization multiplier for Kx
+#' @param standardize Whether to scale variables
 #' @param LW_Sy Whether to apply Ledoit-Wolf shrinkage to Sy
 #' @param solver Either "ADMM" or "CVXR"
 #' @param rho ADMM parameter
@@ -102,14 +100,14 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda) {
 #' @export
 cca_group_rrr <- function(X, Y, groups, 
                          Sx = NULL, Sy = NULL, Sxy = NULL, 
-                         lambda = 0, Kx = NULL, r,
-                         do.scale = FALSE, lambda_Kx = 0,
+                         lambda = 0,  r,
+                         standardize = FALSE, 
                          LW_Sy = FALSE, solver = "ADMM",
                          rho = 1, niter = 1e4, thresh = 1e-4, verbose = FALSE) {
 
   n <- nrow(X); p <- ncol(X); q <- ncol(Y)
 
-  if (do.scale) {
+  if (standardize) {
     X <- scale(X); Y <- scale(Y)
   } else {
     X <- scale(X, scale = FALSE); Y <- scale(Y, scale = FALSE)
@@ -127,7 +125,7 @@ cca_group_rrr <- function(X, Y, groups,
   tilde_Y <- Y %*% sqrt_inv_Sy
 
   B_opt <- switch(solver,
-    "ADMM" = solve_group_rrr_admm(X, tilde_Y, Sx, groups, lambda, Kx, lambda_Kx, rho, niter, thresh, verbose),
+    "ADMM" = solve_group_rrr_admm(X, tilde_Y, Sx, groups, rho, niter, thresh, verbose),
     "CVXR" = solve_group_rrr_cvxr(X, tilde_Y, groups, lambda),
     stop("Unsupported solver: choose either 'ADMM' or 'CVXR'")
   )
@@ -155,12 +153,12 @@ cca_group_rrr <- function(X, Y, groups,
 
 # Cross-validated loss for group-penalized CCA
 cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 5, 
-                                 lambda = 0.01, r = 2, Kx = NULL, lambda_Kx = 0, 
-                                 do.scale = FALSE, LW_Sy = FALSE, solver = "ADMM", 
+                                 lambda = 0.01, r = 2, 
+                                 standardize = FALSE, LW_Sy = FALSE, solver = "ADMM", 
                                  rho = 1, niter = 1e4, thresh = 1e-4, verbose = FALSE) {
 
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
-  no_cores <- detectCores() - 2
+  no_cores <- parallel::detectCores() - 2
   registerDoParallel(cores = no_cores)
 
   rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c("CVXR", "Matrix")) %dopar% {
@@ -169,8 +167,8 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 
     tryCatch({
       fit <- cca_group_rrr(X_train, Y_train, groups, Sx = NULL, Sy = NULL,
-                           lambda = lambda, Kx = Kx, r = r, lambda_Kx = lambda_Kx,
-                           do.scale = do.scale, LW_Sy = LW_Sy, solver = solver,
+                           lambda = lambda, r = r, 
+                           standardize = standardize, LW_Sy = LW_Sy, solver = solver,
                            rho = rho, niter = niter, thresh = thresh, verbose = FALSE)
       mean((X_val %*% fit$U - Y_val %*% fit$V)^2)
     }, error = function(e) {
@@ -193,12 +191,10 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 #' @param groups List of index vectors defining groups of predictors
 #' @param Sx Optional covariance matrix for X; if NULL computed internally
 #' @param Sy Optional covariance matrix for Y; if NULL computed internally
-#' @param param_lambda Grid of regularization parameters to try out
-#' @param Kx Optional additional penalty matrix for X
+#' @param lambdas Grid of regularization parameters to try out
 #' @param r Target rank
 #' @param kfolds Nb of folds for the CV procedure
-#' @param do.scale Whether to scale variables
-#' @param lambda_Kx Regularization multiplier for Kx
+#' @param standardize Whether to scale variables
 #' @param LW_Sy Whether to apply Ledoit-Wolf shrinkage to Sy
 #' @param solver Either "ADMM" or "CVXR"
 #' @param rho ADMM parameter
@@ -215,9 +211,9 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 #'   \item{cor}{Canonical covariances}
 #' }
 #' @export
-cca_group_rrr_cv <- function(X, Y, groups, r = 2, Kx = NULL, lambda_Kx = 0,
-                             param_lambda = 10^seq(-3, 1.5, length.out = 10),
-                             kfolds = 5, parallelize = FALSE, do.scale = FALSE,
+cca_group_rrr_cv <- function(X, Y, groups, r = 2, 
+                             lambdas = 10^seq(-3, 1.5, length.out = 10),
+                             kfolds = 5, parallelize = FALSE, standardize = FALSE,
                              LW_Sy = FALSE, solver = "ADMM", rho = 1,
                              niter = 1e4, thresh = 1e-4, verbose = FALSE) {
 
@@ -225,26 +221,26 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2, Kx = NULL, lambda_Kx = 0,
     warning("Both X and Y are high-dimensional; method may be unstable.")
   }
 
-  X <- if (do.scale) scale(X) else scale(X, scale = FALSE)
-  Y <- if (do.scale) scale(Y) else scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) else scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
 
   Sx <- t(X) %*% X / nrow(X)
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose=verbose )) else t(Y) %*% Y / nrow(Y)
 
   run_cv <- function(lambda) {
     rmse <- cca_group_rrr_cv_folds(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = kfolds,
-                                 lambda = lambda, r = r, Kx = Kx, lambda_Kx = lambda_Kx,
-                                 do.scale = do.scale, LW_Sy = LW_Sy, solver = solver,
+                                 lambda = lambda, r = r, 
+                                 standardize = standardize, LW_Sy = LW_Sy, solver = solver,
                                  rho = rho, niter = niter, thresh = thresh)
     data.frame(lambda = lambda, rmse = rmse)
   }
 
   results <- if (parallelize) {
-    no_cores <- detectCores() - 5
+    no_cores <- parallel::detectCores() - 5
     registerDoParallel(cores = no_cores)
-    foreach(lambda = param_lambda, .combine = rbind, .packages = c("CVXR", "Matrix")) %dopar% run_cv(lambda)
+    foreach(lambda = lambdas, .combine = rbind, .packages = c("CVXR", "Matrix")) %dopar% run_cv(lambda)
   } else {
-    purrr::map_dfr(param_lambda, run_cv)
+    purrr::map_dfr(lambdas, run_cv)
   }
 
   results$rmse[is.na(results$rmse) | results$rmse == 0] <- 1e8
@@ -254,7 +250,7 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2, Kx = NULL, lambda_Kx = 0,
   if (is.na(opt_lambda)) opt_lambda <- 0.1
 
   final <- cca_group_rrr(X, Y, groups, Sx = Sx, Sy = Sy, lambda = opt_lambda,
-                         Kx = Kx, r = r, lambda_Kx = lambda_Kx, do.scale = do.scale,
+                         r = r, standardize = standardize,
                          LW_Sy = LW_Sy, solver = solver, rho = rho, niter = niter, verbose=verbose)
 
   list(

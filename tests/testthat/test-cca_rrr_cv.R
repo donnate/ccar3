@@ -65,8 +65,8 @@ test_that("cca_rrr_cv returns the correct answer", {
   X = gen$X
   Y = gen$Y
   result <- cca_rrr_cv(X, Y, r = r,
-                      solver = "ADMM", param_lambda=10^seq(-5, 1.5, length.out = 10),
-                      kfolds=3, Kx=NULL, parallelize = TRUE,
+                      solver = "ADMM", lambdas=10^seq(-5, 1.5, length.out = 10),
+                      kfolds=3, parallelize = TRUE,
                       LW_Sy = FALSE)
   
   expect_type(result, "list")

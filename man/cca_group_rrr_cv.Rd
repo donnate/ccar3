@@ -9,12 +9,10 @@ cca_group_rrr_cv(
   Y,
   groups,
   r = 2,
-  Kx = NULL,
-  lambda_Kx = 0,
-  param_lambda = 10^seq(-3, 1.5, length.out = 10),
+  lambdas = 10^seq(-3, 1.5, length.out = 10),
   kfolds = 5,
   parallelize = FALSE,
-  do.scale = FALSE,
+  standardize = FALSE,
   LW_Sy = FALSE,
   solver = "ADMM",
   rho = 1,
@@ -32,15 +30,11 @@ cca_group_rrr_cv(
 
 \item{r}{Target rank}
 
-\item{Kx}{Optional additional penalty matrix for X}
-
-\item{lambda_Kx}{Regularization multiplier for Kx}
-
-\item{param_lambda}{Grid of regularization parameters to try out}
+\item{lambdas}{Grid of regularization parameters to try out}
 
 \item{kfolds}{Nb of folds for the CV procedure}
 
-\item{do.scale}{Whether to scale variables}
+\item{standardize}{Whether to scale variables}
 
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
 

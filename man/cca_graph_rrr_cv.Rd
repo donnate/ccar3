@@ -9,12 +9,10 @@ cca_graph_rrr_cv(
   Y,
   Gamma,
   r = 2,
-  Kx = NULL,
-  lambda_Kx = 0,
-  param_lambda = 10^seq(-3, 1.5, length.out = 10),
+  lambdas = 10^seq(-3, 1.5, length.out = 10),
   kfolds = 5,
   parallelize = FALSE,
-  do.scale = FALSE,
+  standardize = FALSE,
   LW_Sy = FALSE,
   rho = 10,
   niter = 10000,
@@ -31,17 +29,13 @@ cca_graph_rrr_cv(
 
 \item{r}{Target rank}
 
-\item{Kx}{Optional penalty matrix to be added to Sx}
-
-\item{lambda_Kx}{Regularization strength for Kx}
-
-\item{param_lambda}{Grid of regularization parameters to test for sparsity}
+\item{lambdas}{Grid of regularization parameters to test for sparsity}
 
 \item{kfolds}{Number of folds for cross-validation}
 
 \item{parallelize}{Whether to parallelize cross-validation}
 
-\item{do.scale}{Whether to center and scale X and Y (default FALSE = center only)}
+\item{standardize}{Whether to center and scale X and Y (default FALSE = center only)}
 
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
 

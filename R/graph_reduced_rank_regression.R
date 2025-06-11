@@ -13,14 +13,14 @@ library(parallel) # Required for detectCores
 
 cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                                 Sx = NULL, Sy = NULL, kfolds = 5,
-                                lambda = 0.01, r = 2, Kx = NULL,
-                                do.scale = FALSE, lambda_Kx = 0,
+                                lambda = 0.01, r = 2, 
+                                standardize = FALSE, 
                                 LW_Sy = FALSE, rho = 10,
                                 niter = 1e4, thresh = 1e-4,
                                 Gamma_dagger = NULL) {
   
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
-  no_cores <- detectCores() - 2
+  no_cores <-parallel::detectCores() - 2
   registerDoParallel(cores = no_cores)
 
   rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('CVXR', 'Matrix')) %dopar% {
@@ -31,8 +31,8 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
     
     tryCatch({
       fit <- cca_graph_rrr(X_train, Y_train, Gamma,
-                           Sx, Sy, lambda, Kx, r,
-                           do.scale, lambda_Kx,
+                           Sx, Sy, lambda, r,
+                           standardize, 
                            LW_Sy, rho, niter, thresh,
                            Gamma_dagger)
 
@@ -60,11 +60,9 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
 #' @param kfolds Number of folds for cross-validation
 #' @param parallelize Whether to parallelize cross-validation
 #' @param Sxy Optional cross-covariance matrix (not currently used)
-#' @param param_lambda Grid of regularization parameters to test for sparsity
-#' @param Kx Optional penalty matrix to be added to Sx
+#' @param lambdas Grid of regularization parameters to test for sparsity
 #' @param r Target rank
-#' @param do.scale Whether to center and scale X and Y (default FALSE = center only)
-#' @param lambda_Kx Regularization strength for Kx
+#' @param standardize Whether to center and scale X and Y (default FALSE = center only)
 #' @param LW_Sy Whether to apply Ledoit-Wolf shrinkage to Sy
 #' @param rho ADMM penalty parameter
 #' @param niter Maximum number of ADMM iterations
@@ -82,10 +80,10 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
 #' }
 #' @export
 cca_graph_rrr_cv <- function(X, Y, Gamma,
-                             r = 2, Kx = NULL, lambda_Kx = 0,
-                             param_lambda = 10^seq(-3, 1.5, length.out = 10),
+                             r = 2, 
+                             lambdas = 10^seq(-3, 1.5, length.out = 10),
                              kfolds = 5, parallelize = FALSE,
-                             do.scale = FALSE, LW_Sy = FALSE,
+                             standardize = FALSE, LW_Sy = FALSE,
                              rho = 10, niter = 1e4, thresh = 1e-4,
                              Gamma_dagger = NULL) {
 
@@ -98,8 +96,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
                                  Sx = NULL, Sy = NULL,
                                  kfolds = kfolds,
                                  lambda = lambda, r = r,
-                                 Kx = Kx, lambda_Kx = lambda_Kx,
-                                 do.scale = do.scale,
+                                 standardize = standardize,
                                  LW_Sy = LW_Sy, rho = rho,
                                  niter = niter, thresh = thresh,
                                  Gamma_dagger = Gamma_dagger)
@@ -107,11 +104,11 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   }
 
   results <- if (parallelize) {
-    no_cores <- detectCores() - 5
+    no_cores <- parallel::detectCores() - 5
     registerDoParallel(cores = no_cores)
-    foreach(lambda = param_lambda, .combine = rbind, .packages = c('CVXR', 'Matrix')) %dopar% run_cv(lambda)
+    foreach(lambda = lambdas, .combine = rbind, .packages = c('CVXR', 'Matrix')) %dopar% run_cv(lambda)
   } else {
-    map_dfr(param_lambda, run_cv)
+    map_dfr(lambdas, run_cv)
   }
 
   results$rmse[is.na(results$rmse) | results$rmse == 0] <- 1e8
@@ -120,8 +117,8 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   opt_lambda <- results$lambda[which.min(results$rmse)]
 
   final <- cca_graph_rrr(X, Y, Gamma, Sx = NULL, Sy = NULL,
-                         lambda = opt_lambda, Kx = Kx, r = r,
-                         lambda_Kx = lambda_Kx, do.scale = do.scale,
+                         lambda = opt_lambda, r = r,
+                          standardize = standardize,
                          LW_Sy = LW_Sy, rho = rho, niter = niter,
                          thresh = thresh, Gamma_dagger = Gamma_dagger)
 
@@ -149,10 +146,8 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
 #' @param Sy Optional covariance matrix for Y. If NULL, computed similarly; optionally shrunk via Ledoit-Wolf
 #' @param Sxy Optional cross-covariance matrix (not currently used)
 #' @param lambda Regularization parameter for sparsity
-#' @param Kx Optional penalty matrix to be added to Sx
 #' @param r Target rank
-#' @param do.scale Whether to center and scale X and Y (default FALSE = center only)
-#' @param lambda_Kx Regularization strength for Kx
+#' @param standardize Whether to center and scale X and Y (default FALSE = center only)
 #' @param LW_Sy Whether to apply Ledoit-Wolf shrinkage to Sy
 #' @param rho ADMM penalty parameter
 #' @param niter Maximum number of ADMM iterations
@@ -170,8 +165,8 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
 #' @export
 cca_graph_rrr <- function(X, Y, Gamma,
                           Sx = NULL, Sy = NULL, Sxy = NULL,
-                          lambda = 0, Kx = NULL, r,
-                          do.scale = FALSE, lambda_Kx = 0,
+                          lambda = 0, r,
+                          standardize = FALSE, 
                           LW_Sy = FALSE, rho = 10,
                           niter = 1e4, thresh = 1e-4,
                           verbose = FALSE, Gamma_dagger = NULL) {
@@ -183,7 +178,7 @@ cca_graph_rrr <- function(X, Y, Gamma,
     tmp <- X; X <- Y; Y <- tmp
   }
 
-  if (do.scale) {
+  if (standardize) {
     X <- scale(X)
     Y <- scale(Y)
   } else {
@@ -218,7 +213,7 @@ cca_graph_rrr <- function(X, Y, Gamma,
   new_Ytilde <- tilde_Y - XPi %*% Projection
 
   # Add structure penalty
-  Sx_tot <- if (!is.null(Kx)) Sx + lambda_Kx * as.matrix(Kx) else Sx
+  Sx_tot <-  Sx
 
   # ADMM initialization
   new_p <- ncol(XGamma_dagger)

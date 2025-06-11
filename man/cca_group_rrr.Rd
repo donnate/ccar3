@@ -12,10 +12,8 @@ cca_group_rrr(
   Sy = NULL,
   Sxy = NULL,
   lambda = 0,
-  Kx = NULL,
   r,
-  do.scale = FALSE,
-  lambda_Kx = 0,
+  standardize = FALSE,
   LW_Sy = FALSE,
   solver = "ADMM",
   rho = 1,
@@ -37,13 +35,9 @@ cca_group_rrr(
 
 \item{lambda}{Regularization parameter}
 
-\item{Kx}{Optional additional penalty matrix for X}
-
 \item{r}{Target rank}
 
-\item{do.scale}{Whether to scale variables}
-
-\item{lambda_Kx}{Regularization multiplier for Kx}
+\item{standardize}{Whether to scale variables}
 
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
 

@@ -10,13 +10,11 @@ cca_rrr(
   Sx = NULL,
   Sy = NULL,
   lambda = 0,
-  Kx = NULL,
   r,
   highdim = TRUE,
-  lambda_Kx = 0,
   solver = "ADMM",
   LW_Sy = FALSE,
-  do.scale = TRUE,
+  standardize = TRUE,
   rho = 1,
   niter = 10000,
   thresh = 1e-04,
@@ -34,19 +32,15 @@ cca_rrr(
 
 \item{lambda}{Regularization parameter.}
 
-\item{Kx}{Optional penalty matrix for X.}
-
 \item{r}{Rank of the solution.}
 
 \item{highdim}{Boolean for high-dimensional regime.}
-
-\item{lambda_Kx}{Regularization strength on penalty matrix Kx.}
 
 \item{solver}{Solver type: "rrr", "CVX", or "ADMM".}
 
 \item{LW_Sy}{Whether to use Ledoit-Wolf shrinkage for Sy.}
 
-\item{do.scale}{Logical; should X and Y be scaled.}
+\item{standardize}{Logical; should X and Y be scaled.}
 
 \item{rho}{ADMM parameter.}
 

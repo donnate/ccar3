@@ -19,14 +19,11 @@ compute_sqrt <- function(S, threshold = 1e-4) {
 }
 
 # Helper: ADMM-based group sparse solver
-solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, Kx, lambda_Kx, rho, niter, thresh, verbose = FALSE) {
+solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho, niter, thresh, verbose = FALSE) {
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
-  if (!is.null(Kx)){
-    Sx_tot <-  Sx + lambda_Kx * as.matrix(Kx)
-  }else{
-    Sx_tot <- Sx
-  }
+  Sx_tot <- Sx
+
 
 
   
@@ -63,7 +60,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda) {
   B <- CVXR::Variable(p, q)
 
   objective <- CVXR::Minimize(1 / n * CVXR::sum_squares(tilde_Y - X %*% B) + lambda * sum(CVXR::norm2(B, axis = 1)))
-  result <- CVXR::solve(Problem(objective))
+  result <- CVXR::solve(CVXR::Problem(objective))
   B_opt <- result$getValue(B)
   
   B_opt[abs(B_opt) < 1e-5] <- 0
@@ -80,13 +77,11 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda) {
 #' @param Sx Optional X covariance matrix.
 #' @param Sy Optional Y covariance matrix.
 #' @param lambda Regularization parameter.
-#' @param Kx Optional penalty matrix for X.
 #' @param r Rank of the solution.
 #' @param highdim Boolean for high-dimensional regime.
-#' @param lambda_Kx Regularization strength on penalty matrix Kx.
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
-#' @param do.scale Logical; should X and Y be scaled.
+#' @param standardize Logical; should X and Y be scaled.
 #' @param rho ADMM parameter.
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
@@ -101,10 +96,11 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda) {
 #' }
 #' @export
 cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
-                    lambda = 0, Kx=NULL, r, highdim=TRUE, 
-                    lambda_Kx=0, solver="ADMM",
+                    lambda = 0, 
+                    r, highdim=TRUE, 
+                    solver="ADMM",
                     LW_Sy = FALSE,
-                    do.scale = TRUE,
+                    standardize = TRUE,
                     rho=1,
                     niter=1e4,
                     thresh = 1e-4, verbose=FALSE) {
@@ -122,8 +118,8 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
     q <- tmp
   }
 
-  X <- if (do.scale) scale(X) else scale(X, scale = FALSE)
-  Y <- if (do.scale) scale(Y) else scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) else scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
 
   if (is.null(Sx)) Sx <- crossprod(X) / n
   if (is.null(Sy)) {
@@ -133,7 +129,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 
   sqrt_inv_Sy <- compute_sqrt_inv(Sy)
   tilde_Y <- Y %*% sqrt_inv_Sy
-  Sx_tot <- if (!is.null(Kx)) Sx + lambda_Kx * as.matrix(Kx) else Sx
+  Sx_tot <- Sx
   Sxy <- crossprod(X, tilde_Y) / n
 
   if (!highdim) {
@@ -150,10 +146,10 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
       B_opt <- solve_rrr_cvxr(X, tilde_Y, lambda) 
     } else if (solver == "ADMM") {
       if(verbose){print("Using ADMM solver")}
-      B_opt <- solve_rrr_admm(X, tilde_Y, Sx, lambda, Kx, lambda_Kx, rho, niter, thresh, verbose = FALSE)
+      B_opt <- solve_rrr_admm(X, tilde_Y, Sx, rho, niter, thresh, verbose = FALSE)
     } else {
       if(verbose){print("Using gglasso solver")}
-      fit <- cv.srrr(tilde_Y, X, nrank = r, method = "glasso", nfold = 2,
+      fit <- rrpack::cv.srrr(tilde_Y, X, nrank = r, method = "glasso", nfold = 2,
                      modstr = list("lamA" = rep(lambda, 10), "nlam" = 10))
       B_opt <- fit$coef
     }
@@ -173,7 +169,6 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   }
 
   loss <- mean((Y %*% V - X %*% U)^2)
-  correlation <- cor(Y %*% V, X %*% U)
   canon_corr <- sapply(seq_len(r), function(i) cov(X %*% U[, i], Y %*% V[, i]))
 
   list(U = U, V = V, loss = loss, cor = canon_corr)
@@ -190,17 +185,14 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param Y Matrix of responses.
 #' @param Sx Optional X covariance matrix.
 #' @param Sy Optional Y covariance matrix.
-#' @param lambda Regularization parameter.
-#' @param Kx Optional penalty matrix for X.
 #' @param r Rank of the solution.
 #' @param kfolds Number of folds for cross-validation.
-#' @param param_lambda Sequence of lambda values for cross-validation.
+#' @param lambdas Sequence of lambda values for cross-validation.
 #' @param parallelize Logical; should cross-validation be parallelized?
 #' @param highdim Boolean for high-dimensional regime.
-#' @param lambda_Kx Regularization strength on penalty matrix Kx.
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
-#' @param do.scale Logical; should X and Y be scaled.
+#' @param standardize Logical; should X and Y be scaled.
 #' @param rho ADMM parameter.
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
@@ -216,37 +208,37 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' }
 #' @export
 cca_rrr_cv <- function(X, Y, 
-                       r=2, Kx = NULL, lambda_Kx = 0,
-                       param_lambda=10^seq(-3, 1.5, length.out = 100),
+                       r=2, 
+                       lambdas=10^seq(-3, 1.5, length.out = 100),
                        kfolds=14,
                        solver="ADMM",
                        parallelize = FALSE,
                        LW_Sy = FALSE,
-                       do.scale=TRUE,
+                       standardize=TRUE,
                        rho=1,
                        niter=1e4,
                        thresh = 1e-4, verbose=FALSE) {
 
-  X <- if (do.scale) scale(X) else scale(X, scale = FALSE)
-  Y <- if (do.scale) scale(Y) else scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) else scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
   n <- nrow(X)
   Sx <- crossprod(X) / n
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose = FALSE)) else crossprod(Y) / n
 
   cv_function <- function(lambda) {
     cca_rrr_cv_folds(X, Y, Sx=NULL, Sy=NULL, kfolds=kfolds, 
-                  lambda=lambda, r=r, solver=solver, Kx=Kx, lambda_Kx=lambda_Kx, 
-                  do.scale=do.scale, rho=rho, niter=niter, thresh=thresh)
+                  lambda=lambda, r=r, solver=solver, 
+                  standardize=standardize, rho=rho, niter=niter, thresh=thresh)
   }
 
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
-    no_cores <- detectCores() - 2
+    no_cores <- parallel::detectCores() - 2
     registerDoParallel(cores=no_cores)
-    resultsx <- foreach(lambda=param_lambda, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
+    resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
   } else {
-    resultsx <- tibble(lambda = param_lambda) %>% 
+    resultsx <- tibble(lambda = lambdas) %>% 
       mutate(rmse = purrr::map_dbl(lambda, cv_function))
   }
 
@@ -257,9 +249,9 @@ cca_rrr_cv <- function(X, Y,
   opt_lambda <- resultsx$lambda[which.min(resultsx$rmse)]
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
 
-  final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, lambda=opt_lambda, Kx=Kx, r=r,
-                   highdim=TRUE, solver=solver, lambda_Kx=lambda_Kx, 
-                   do.scale=do.scale, LW_Sy=LW_Sy, rho=rho, niter=niter, 
+  final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, lambda=opt_lambda, r=r,
+                   highdim=TRUE, solver=solver,
+                   standardize=standardize, LW_Sy=LW_Sy, rho=rho, niter=niter, 
                    thresh=thresh, verbose=verbose)
 
   sqrt_inv_Sy <- compute_sqrt_inv(Sy)
@@ -278,9 +270,8 @@ cca_rrr_cv <- function(X, Y,
 #' @return Average RMSE across folds.
 cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                           lambda=0.01,
-                          r=2, Kx = NULL,
-                          lambda_Kx = 0,
-                          do.scale=TRUE,
+                          r=2,
+                          standardize=TRUE,
                           solver = "ADMM",
                           rho=1,
                           LW_Sy = TRUE,
@@ -288,7 +279,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                           thresh = 1e-4) {
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
 
-  no_cores <- detectCores() - 2
+  no_cores <- parallel::detectCores() - 2
   registerDoParallel(cores=no_cores) 
 
   rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('CVXR', 'Matrix')) %dopar% {
@@ -299,8 +290,8 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
 
     tryCatch({
       final <- cca_rrr(X_train, Y_train, Sx=NULL, Sy=NULL, highdim=TRUE,
-                       lambda=lambda, Kx=Kx, r=r, solver=solver, lambda_Kx=lambda_Kx,
-                       LW_Sy=LW_Sy, do.scale=do.scale, rho=rho, niter=niter, thresh=thresh,
+                       lambda=lambda, r=r, solver=solver,
+                       LW_Sy=LW_Sy, standardize=standardize, rho=rho, niter=niter, thresh=thresh,
                        verbose=FALSE)
       mean((X_val %*% final$U - Y_val %*% final$V)^2)
     }, error = function(e) {

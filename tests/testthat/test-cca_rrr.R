@@ -29,7 +29,7 @@ test_that("cca_rrr returns the correct answer", {
                                   n_new = 5000) 
   X = gen$X
   Y = gen$Y
-  result <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0, Kx=NULL, r, highdim=TRUE,
+  result <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0, r, highdim=TRUE,
                     LW_Sy = TRUE)
   
   expect_type(result, "list")
@@ -57,16 +57,16 @@ test_that("cca_rrr computes the same solutions across solvers", {
   X = gen$X
   Y = gen$Y  
 
-  result1 <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0.1, Kx=NULL, highdim=TRUE,
+  result1 <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0.1, highdim=TRUE,
                     LW_Sy = TRUE, solver="srrr")
   print("Done srrr")
 
   result2 <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0.1, rho=10,
-                     Kx=NULL, highdim=TRUE,
+                     highdim=TRUE,
                      LW_Sy = TRUE, solver="ADMM")
   print("Done ADMM")
   result3 <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0.1,
-                     Kx=NULL, highdim=TRUE,
+                    highdim=TRUE,
                     LW_Sy = TRUE, solver="CVX")
   print("Done CVXR")
   
