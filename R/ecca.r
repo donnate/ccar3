@@ -146,7 +146,7 @@ ecca = function(X, Y, lambda = 0, groups = NULL, r = 2,
     # V0 = SVD$v[, 1:r, drop = F]
     # L0 = SVD$d[1:r]
 
-    SVD = svds(C, r)
+    SVD = RSpectra::svds(C, r)
     U0 = SVD$u
     V0 = SVD$v
     L0 = SVD$d
@@ -250,7 +250,7 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,
     # V0 = SVD$v[, 1:r, drop = F]
     # L0 = SVD$d[1:r]
 
-    SVD = svds(C, r)
+    SVD = RSpectra::svds(C, r)
     U0 = SVD$u
     V0 = SVD$v
     L0 = SVD$d
