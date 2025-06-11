@@ -334,7 +334,7 @@ ecca.eval = function(X, Y, lambdas = 0, groups = NULL, r = 2,
             scores.cv = cbind(scores.cv, scores)
         }
     }
-    scores = data.frame(lambda = lambdas, mse = rowMeans(scores.cv), se = rowSds(scores.cv)/sqrt(nfold))
+    scores = data.frame(lambda = lambdas, mse = rowMeans(scores.cv), se = matrixStats::rowSds(scores.cv)/sqrt(nfold))
     # plt = scores %>%
     #   ggplot(aes(lambda, mse))+
     #   geom_point()+
