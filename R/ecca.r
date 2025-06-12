@@ -284,7 +284,7 @@ ecca.eval = function(X, Y, lambdas = 0, groups = NULL, r = 2,
   
   ## Cross validation
       if(parallel){
-        registerDoParallel(makeCluster(detectCores() - 2, type = "PSOCK"))
+        registerDoParallel(parallel::makeCluster(parallel::detectCores() - 2, type = "PSOCK"))
         ## Parallel cross validation
         cv = foreach(fold = folds, .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), .packages = c("SMUT", "rARPACK", "crayon")) %dopar% {
           

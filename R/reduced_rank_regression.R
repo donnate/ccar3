@@ -19,13 +19,10 @@ compute_sqrt <- function(S, threshold = 1e-4) {
 }
 
 # Helper: ADMM-based group sparse solver
-solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho, niter, thresh, verbose = FALSE) {
+solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verbose = FALSE) {
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
   Sx_tot <- Sx
-
-
-
   
   prod_xy <- t(X) %*% tilde_Y / nrow(X)
   invSx <- solve(Sx_tot + rho * diag(p))
@@ -146,7 +143,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
       B_opt <- solve_rrr_cvxr(X, tilde_Y, lambda) 
     } else if (solver == "ADMM") {
       if(verbose){print("Using ADMM solver")}
-      B_opt <- solve_rrr_admm(X, tilde_Y, Sx, rho, niter, thresh, verbose = FALSE)
+      B_opt <- solve_rrr_admm(X, tilde_Y, Sx, lambda=lambda, rho=rho, niter=niter, thresh=thresh, verbose = FALSE)
     } else {
       if(verbose){print("Using gglasso solver")}
       fit <- rrpack::cv.srrr(tilde_Y, X, nrank = r, method = "glasso", nfold = 2,
@@ -206,6 +203,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #'   \item{rmse}{Mean squared error of prediction (as computed in the CV)}
 #'   \item{cor}{Canonical correlations}
 #' }
+#' @importFrom foreach foreach %dopar%
 #' @export
 cca_rrr_cv <- function(X, Y, 
                        r=2, 
@@ -233,7 +231,7 @@ cca_rrr_cv <- function(X, Y,
 
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
     no_cores <- parallel::detectCores() - 2
-    registerDoParallel(cores=no_cores)
+    doParallel::registerDoParallel(cores=no_cores)
     resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
@@ -280,7 +278,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
 
   no_cores <- parallel::detectCores() - 2
-  registerDoParallel(cores=no_cores) 
+  doParallel::registerDoParallel(cores=no_cores) 
 
   rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('CVXR', 'Matrix')) %dopar% {
     X_train <- X[-folds[[i]], ]

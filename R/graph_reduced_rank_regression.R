@@ -10,7 +10,6 @@ library(CVXR)
 library(caret) # Required for createFolds
 library(parallel) # Required for detectCores
 
-
 cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                                 Sx = NULL, Sy = NULL, kfolds = 5,
                                 lambda = 0.01, r = 2, 
@@ -21,7 +20,7 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
   
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   no_cores <-parallel::detectCores() - 2
-  registerDoParallel(cores = no_cores)
+  doParallel::registerDoParallel(cores = no_cores)
 
   rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('CVXR', 'Matrix')) %dopar% {
     X_train <- X[-folds[[i]], ]
@@ -78,6 +77,8 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
 #'   \item{rmse}{Mean squared error of prediction (as computed in the CV)}
 #'   \item{cor}{Canonical covariances}
 #' }
+#' @importFrom foreach foreach %dopar%
+
 #' @export
 cca_graph_rrr_cv <- function(X, Y, Gamma,
                              r = 2, 
@@ -105,10 +106,10 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
 
   results <- if (parallelize) {
     no_cores <- parallel::detectCores() - 5
-    registerDoParallel(cores = no_cores)
+    doParallel::registerDoParallel(cores = no_cores)
     foreach(lambda = lambdas, .combine = rbind, .packages = c('CVXR', 'Matrix')) %dopar% run_cv(lambda)
   } else {
-    map_dfr(lambdas, run_cv)
+    purrr::map_dfr(lambdas, run_cv)
   }
 
   results$rmse[is.na(results$rmse) | results$rmse == 0] <- 1e8
@@ -203,13 +204,13 @@ cca_graph_rrr <- function(X, Y, Gamma,
   tilde_Y <- Y %*% sqrt_inv_Sy
 
   # Graph penalty
-  if (is.null(Gamma_dagger)) Gamma_dagger <- pinv(Gamma)
+  if (is.null(Gamma_dagger)) Gamma_dagger <- pracma::pinv(Gamma)
   Pi <- diag(p) - Gamma_dagger %*% Gamma
   XPi <- X %*% Pi
   XGamma_dagger <- X %*% Gamma_dagger
 
   # Remove projection on Pi
-  Projection <- pinv(t(XPi) %*% XPi) %*% t(XPi) %*% tilde_Y
+  Projection <- pracma::pinv(t(XPi) %*% XPi) %*% t(XPi) %*% tilde_Y
   new_Ytilde <- tilde_Y - XPi %*% Projection
 
   # Add structure penalty

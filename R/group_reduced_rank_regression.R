@@ -10,7 +10,7 @@ library(doParallel)
 library(CVXR)
 
 # Helper: ADMM-based group sparse solver
-solve_group_rrr_admm <- function(X, tilde_Y, Sx, groups, lambda, rho, niter, thresh, verbose = FALSE) {
+solve_group_rrr_admm <- function(X, tilde_Y, Sx, groups, lambda, rho=1, niter=1e4, thresh=0.00001, verbose = FALSE) {
   p <- ncol(X); q <- ncol(tilde_Y)
   Sx_tot <- Sx
   prod_xy <- t(X) %*% tilde_Y / nrow(X)
@@ -125,7 +125,7 @@ cca_group_rrr <- function(X, Y, groups,
   tilde_Y <- Y %*% sqrt_inv_Sy
 
   B_opt <- switch(solver,
-    "ADMM" = solve_group_rrr_admm(X, tilde_Y, Sx, groups, rho, niter, thresh, verbose),
+    "ADMM" = solve_group_rrr_admm(X, tilde_Y, Sx, groups=groups, lambda=lambda, rho=rho, niter=niter, thresh=thresh, verbose),
     "CVXR" = solve_group_rrr_cvxr(X, tilde_Y, groups, lambda),
     stop("Unsupported solver: choose either 'ADMM' or 'CVXR'")
   )
@@ -159,7 +159,7 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   no_cores <- parallel::detectCores() - 2
-  registerDoParallel(cores = no_cores)
+  doParallel::registerDoParallel(cores = no_cores)
 
   rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c("CVXR", "Matrix")) %dopar% {
     X_train <- X[-folds[[i]], ]; Y_train <- Y[-folds[[i]], ]
@@ -210,6 +210,7 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 #'   \item{rmse}{Mean squared error of prediction (as computed in the CV)}
 #'   \item{cor}{Canonical covariances}
 #' }
+#' @importFrom foreach foreach %dopar%
 #' @export
 cca_group_rrr_cv <- function(X, Y, groups, r = 2, 
                              lambdas = 10^seq(-3, 1.5, length.out = 10),
@@ -237,7 +238,7 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
 
   results <- if (parallelize) {
     no_cores <- parallel::detectCores() - 5
-    registerDoParallel(cores = no_cores)
+    doParallel::registerDoParallel(cores = no_cores)
     foreach(lambda = lambdas, .combine = rbind, .packages = c("CVXR", "Matrix")) %dopar% run_cv(lambda)
   } else {
     purrr::map_dfr(lambdas, run_cv)
