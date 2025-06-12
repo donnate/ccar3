@@ -8,14 +8,12 @@ cca_rrr_cv(
   X,
   Y,
   r = 2,
-  Kx = NULL,
-  lambda_Kx = 0,
-  param_lambda = 10^seq(-3, 1.5, length.out = 100),
+  lambdas = 10^seq(-3, 1.5, length.out = 100),
   kfolds = 14,
   solver = "ADMM",
   parallelize = FALSE,
   LW_Sy = FALSE,
-  do.scale = TRUE,
+  standardize = TRUE,
   rho = 1,
   niter = 10000,
   thresh = 1e-04,
@@ -29,11 +27,7 @@ cca_rrr_cv(
 
 \item{r}{Rank of the solution.}
 
-\item{Kx}{Optional penalty matrix for X.}
-
-\item{lambda_Kx}{Regularization strength on penalty matrix Kx.}
-
-\item{param_lambda}{Sequence of lambda values for cross-validation.}
+\item{lambdas}{Sequence of lambda values for cross-validation.}
 
 \item{kfolds}{Number of folds for cross-validation.}
 
@@ -43,7 +37,7 @@ cca_rrr_cv(
 
 \item{LW_Sy}{Whether to use Ledoit-Wolf shrinkage for Sy.}
 
-\item{do.scale}{Logical; should X and Y be scaled.}
+\item{standardize}{Logical; should X and Y be scaled.}
 
 \item{rho}{ADMM parameter.}
 
@@ -56,8 +50,6 @@ cca_rrr_cv(
 \item{Sx}{Optional X covariance matrix.}
 
 \item{Sy}{Optional Y covariance matrix.}
-
-\item{lambda}{Regularization parameter.}
 
 \item{highdim}{Boolean for high-dimensional regime.}
 }

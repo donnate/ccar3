@@ -41,7 +41,7 @@ test_that("cca_group returns the correct answer", {
                                  n_new = 5000)
   X = gen$X
   Y = gen$Y
-  result <- cca_group_rrr(X, Y, r = r, group=gen$groups, Sx=NULL,  Sy=NULL, lambda=0.01, Kx=NULL,
+  result <- cca_group_rrr(X, Y, r = r, group=gen$groups, Sx=NULL,  Sy=NULL, lambda=0.01,
                     LW_Sy = TRUE)
   
   expect_type(result, "list")
@@ -71,10 +71,10 @@ test_that("cca_group computes the same solutions across solvers", {
   X = gen$X
   Y = gen$Y                          
   result1 <- cca_group_rrr(X, Y, r = r, groups=gen$groups, Sx=NULL,  Sy=NULL, 
-                          lambda=0.1, Kx=NULL, LW_Sy = TRUE, solver="ADMM")
+                          lambda=0.1, LW_Sy = TRUE, solver="ADMM")
   result2 <- cca_group_rrr(X, Y, r = r, 
                           groups=gen$groups, 
-                          Sx=NULL,  Sy=NULL, lambda=0.1, Kx=NULL, 
+                          Sx=NULL,  Sy=NULL, lambda=0.1,
                           LW_Sy = TRUE, solver="CVXR")
   
   expect_true(subdistance(result1$U, gen$u) <0.35)

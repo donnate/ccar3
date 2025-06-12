@@ -12,10 +12,8 @@ cca_graph_rrr(
   Sy = NULL,
   Sxy = NULL,
   lambda = 0,
-  Kx = NULL,
   r,
-  do.scale = FALSE,
-  lambda_Kx = 0,
+  standardize = FALSE,
   LW_Sy = FALSE,
   rho = 10,
   niter = 10000,
@@ -39,13 +37,9 @@ cca_graph_rrr(
 
 \item{lambda}{Regularization parameter for sparsity}
 
-\item{Kx}{Optional penalty matrix to be added to Sx}
-
 \item{r}{Target rank}
 
-\item{do.scale}{Whether to center and scale X and Y (default FALSE = center only)}
-
-\item{lambda_Kx}{Regularization strength for Kx}
+\item{standardize}{Whether to center and scale X and Y (default FALSE = center only)}
 
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
 
