@@ -47,7 +47,7 @@ rmat = function(n, p){
 #' @param groups List of index vectors defining groups of predictors
 #' @param lambda Regularization parameter
 #' @param r Target rank
-#' @param do.scale Whether to scale variables
+#' @param standardize Whether to scale variables
 #' @param B0 Initial value for the coefficient matrix (optional)
 #' @param eps Convergence threshold for ADMM
 #' @param rho ADMM parameter
@@ -62,15 +62,17 @@ rmat = function(n, p){
 #'   \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
 #' }
 #' @export
-ecca = function(X, Y, lambda = 0, groups = NULL, r = 2,  
+ecca = function(X, Y, lambda = 0, groups = NULL, r = 2,  standardize = F,
                 rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = T){
   
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
   ##### Need to make sure that they are centered
-  X = scale(X, center = T, scale = F)
-  Y = scale(Y, center = T, scale = F)
+  if (standardize) {
+    X = scale(X)
+    Y = scale(Y)
+  } 
   
   Sxy = matmul(t(X), Y)/ n
   Sx = matmul(t(X), X) / n
@@ -270,7 +272,8 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,
 
 
 ecca.eval = function(X, Y, lambdas = 0, groups = NULL, r = 2, 
-                   rho = 1, B0 = NULL, nfold = 5, eps = 1e-4, maxiter = 500, verbose = T, parallel = T){
+                    rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
+                    maxiter = 500, verbose = T, parallel = T){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -392,7 +395,8 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2,
   cat("\n\nselected lambda:", lambda.opt)
   
   # Fit lasso
-  ECCA = ecca_across_lambdas(X, Y, lambda.opt, groups, r, rho, B0, eps, maxiter, verbose = verbose)
+  ECCA = ecca(X, Y, lambda=lambda.opt, groups = groups, r=r, rho=rho, B0=B0, eps=eps, 
+              maxiter = maxiter, verbose = verbose)
   
   return(list(U = ECCA$U, V = ECCA$V, 
               cor = diag(t(ECCA$U) %*% matmul(t(X), Y) %*% ECCA$V), 
