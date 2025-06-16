@@ -223,8 +223,8 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
     warning("Both X and Y are high-dimensional; method may be unstable.")
   }
 
-  X <- if (standardize) scale(X) #else scale(X, scale = FALSE)
-  Y <- if (standardize) scale(Y) #else scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) else Y #scale(Y, scale = FALSE)
 
   Sx <- t(X) %*% X / nrow(X)
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose=verbose )) else t(Y) %*% Y / nrow(Y)

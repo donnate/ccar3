@@ -115,8 +115,8 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
     q <- tmp
   }
 
-  X <- if (standardize) scale(X) #else scale(X, scale = FALSE)
-  Y <- if (standardize) scale(Y) #else scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) else Y # scale(Y, scale = FALSE)
 
   if (is.null(Sx)) Sx <- crossprod(X) / n
   if (is.null(Sy)) {
@@ -217,8 +217,8 @@ cca_rrr_cv <- function(X, Y,
                        niter=1e4,
                        thresh = 1e-4, verbose=FALSE) {
 
-  X <- if (standardize) scale(X) #else scale(X, scale = FALSE)
-  Y <- if (standardize) scale(Y) #else scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) else Y #scale(Y, scale = FALSE)
   n <- nrow(X)
   Sx <- crossprod(X) / n
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose = FALSE)) else crossprod(Y) / n
@@ -269,7 +269,7 @@ cca_rrr_cv <- function(X, Y,
 cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                           lambda=0.01,
                           r=2,
-                          standardize=TRUE,
+                          standardize=FALSE,
                           solver = "ADMM",
                           rho=1,
                           LW_Sy = TRUE,
@@ -289,7 +289,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
     tryCatch({
       final <- cca_rrr(X_train, Y_train, Sx=NULL, Sy=NULL, highdim=TRUE,
                        lambda=lambda, r=r, solver=solver,
-                       LW_Sy=LW_Sy, standardize=standardize, rho=rho, niter=niter, thresh=thresh,
+                       LW_Sy=LW_Sy, standardize=FALSE, rho=rho, niter=niter, thresh=thresh,
                        verbose=FALSE)
       mean((X_val %*% final$U - Y_val %*% final$V)^2)
     }, error = function(e) {
