@@ -109,9 +109,10 @@ cca_group_rrr <- function(X, Y, groups,
 
   if (standardize) {
     X <- scale(X); Y <- scale(Y)
-  } else {
-    X <- scale(X, scale = FALSE); Y <- scale(Y, scale = FALSE)
   }
+  #  else {
+  #   X <- scale(X, scale = FALSE); Y <- scale(Y, scale = FALSE)
+  # }
 
   if (n < min(p, q)) warning("Both X and Y are high-dimensional; method may be unstable.")
   if (is.null(Sx)) Sx <- t(X) %*% X / n
@@ -168,7 +169,7 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
     tryCatch({
       fit <- cca_group_rrr(X_train, Y_train, groups, Sx = NULL, Sy = NULL,
                            lambda = lambda, r = r, 
-                           standardize = standardize, LW_Sy = LW_Sy, solver = solver,
+                           standardize = FALSE, LW_Sy = LW_Sy, solver = solver,
                            rho = rho, niter = niter, thresh = thresh, verbose = FALSE)
       mean((X_val %*% fit$U - Y_val %*% fit$V)^2)
     }, error = function(e) {
@@ -231,7 +232,7 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
   run_cv <- function(lambda) {
     rmse <- cca_group_rrr_cv_folds(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = kfolds,
                                  lambda = lambda, r = r, 
-                                 standardize = standardize, LW_Sy = LW_Sy, solver = solver,
+                                 standardize = FALSE, LW_Sy = LW_Sy, solver = solver,
                                  rho = rho, niter = niter, thresh = thresh)
     data.frame(lambda = lambda, rmse = rmse)
   }
@@ -251,7 +252,7 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
   if (is.na(opt_lambda)) opt_lambda <- 0.1
 
   final <- cca_group_rrr(X, Y, groups, Sx = Sx, Sy = Sy, lambda = opt_lambda,
-                         r = r, standardize = standardize,
+                         r = r, standardize = FALSE,
                          LW_Sy = LW_Sy, solver = solver, rho = rho, niter = niter, verbose=verbose)
 
   list(

@@ -217,8 +217,8 @@ cca_rrr_cv <- function(X, Y,
                        niter=1e4,
                        thresh = 1e-4, verbose=FALSE) {
 
-  X <- if (standardize) scale(X) else scale(X, scale = FALSE)
-  Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) #else scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) #else scale(Y, scale = FALSE)
   n <- nrow(X)
   Sx <- crossprod(X) / n
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose = FALSE)) else crossprod(Y) / n
@@ -226,7 +226,7 @@ cca_rrr_cv <- function(X, Y,
   cv_function <- function(lambda) {
     cca_rrr_cv_folds(X, Y, Sx=NULL, Sy=NULL, kfolds=kfolds, 
                   lambda=lambda, r=r, solver=solver, 
-                  standardize=standardize, rho=rho, niter=niter, thresh=thresh)
+                  standardize=FALSE, rho=rho, niter=niter, thresh=thresh)
   }
 
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
@@ -249,7 +249,7 @@ cca_rrr_cv <- function(X, Y,
 
   final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, lambda=opt_lambda, r=r,
                    highdim=TRUE, solver=solver,
-                   standardize=standardize, LW_Sy=LW_Sy, rho=rho, niter=niter, 
+                   standardize=FALSE, LW_Sy=LW_Sy, rho=rho, niter=niter, 
                    thresh=thresh, verbose=verbose)
 
   sqrt_inv_Sy <- compute_sqrt_inv(Sy)
