@@ -378,11 +378,20 @@ ecca.eval = function(X, Y, lambdas = 0, groups = NULL, r = 2,
 #'   \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
 #' }
 #' @export
-ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, 
-                 rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, verbose = F, parallel = F){
+ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
+                 rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
+                 verbose = F, parallel = F){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
+
+  if (standardize) {
+    X = scale(X)
+    Y = scale(Y)
+  } 
+  
+
+
   
   # Select lambda
   if(length(lambdas) > 1){
@@ -396,6 +405,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2,
   
   # Fit lasso
   ECCA = ecca(X, Y, lambda=lambda.opt, groups = groups, r=r, rho=rho, B0=B0, eps=eps, 
+              standardize = FALSE,
               maxiter = maxiter, verbose = verbose)
   
   return(list(U = ECCA$U, V = ECCA$V, 

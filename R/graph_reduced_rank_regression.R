@@ -84,7 +84,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
                              r = 2, 
                              lambdas = 10^seq(-3, 1.5, length.out = 10),
                              kfolds = 5, parallelize = FALSE,
-                             standardize = FALSE, LW_Sy = FALSE,
+                             standardize = TRUE, LW_Sy = FALSE,
                              rho = 10, niter = 1e4, thresh = 1e-4,
                              Gamma_dagger = NULL) {
 
@@ -92,12 +92,19 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
     warning("Both X and Y are high dimensional; method may fail.")
   }
 
+  if (standardize) {
+    X <- scale(X)
+    Y <- scale(Y)
+  } 
+
+
+
   run_cv <- function(lambda) {
     rmse <- cca_graph_rrr_cv_folds(X, Y, Gamma,
                                  Sx = NULL, Sy = NULL,
                                  kfolds = kfolds,
                                  lambda = lambda, r = r,
-                                 standardize = standardize,
+                                 standardize = FALSE,
                                  LW_Sy = LW_Sy, rho = rho,
                                  niter = niter, thresh = thresh,
                                  Gamma_dagger = Gamma_dagger)
@@ -119,7 +126,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
 
   final <- cca_graph_rrr(X, Y, Gamma, Sx = NULL, Sy = NULL,
                          lambda = opt_lambda, r = r,
-                          standardize = standardize,
+                         standardize = FALSE,
                          LW_Sy = LW_Sy, rho = rho, niter = niter,
                          thresh = thresh, Gamma_dagger = Gamma_dagger)
 
