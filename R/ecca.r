@@ -257,9 +257,12 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,
     V0 = SVD$v
     L0 = SVD$d
 
+
+     inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
+
     if(max(L0) > 1e-8){
-      U[[i]] = matmul(matmul(matmul(B, Sy12),V0), diag(1 / L0, nrow = length(L0)))
-      V[[i]] = matmul(matmul(matmul(t(B), Sx12), U0), diag(1 / L0, nrow = length(L0)))
+      U[[i]] = matmul(matmul(matmul(B, Sy12),V0), diag(inv_L0, nrow = length(L0)))
+      V[[i]] = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
     } else{
       U[[i]] = matrix(NA, p, r)
       V[[i]] = matrix(NA, q, r)
@@ -283,7 +286,7 @@ ecca.eval = function(X, Y, lambdas = 0, groups = NULL, r = 2,
   folds = caret::createFolds(1:n, k = nfold, list = T)
   
   ## Choose penalty lambda
-  results = data.frame(lambda = numeric(), mse = numeric(), se = numeric())
+  results <- data.frame(lambda = numeric(), mse = numeric(), se = numeric())
   
   ## Cross validation
       if(parallel){
