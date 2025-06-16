@@ -115,8 +115,8 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
     q <- tmp
   }
 
-  X <- if (standardize) scale(X) else scale(X, scale = FALSE)
-  Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) #else scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) #else scale(Y, scale = FALSE)
 
   if (is.null(Sx)) Sx <- crossprod(X) / n
   if (is.null(Sy)) {
