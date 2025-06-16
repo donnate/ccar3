@@ -182,10 +182,11 @@ cca_graph_rrr <- function(X, Y, Gamma,
   if (standardize) {
     X <- scale(X)
     Y <- scale(Y)
-  } else {
-    X <- scale(X, scale = FALSE)
-    Y <- scale(Y, scale = FALSE)
-  }
+  } 
+  # else {
+  #   X <- scale(X, scale = FALSE)
+  #   Y <- scale(Y, scale = FALSE)
+  # }
 
   if (n < min(p, q)) {
     warning("Both X and Y are high dimensional; method may be unstable.")
