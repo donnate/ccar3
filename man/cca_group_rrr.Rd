@@ -14,11 +14,12 @@ cca_group_rrr(
   lambda = 0,
   r,
   standardize = FALSE,
-  LW_Sy = FALSE,
+  LW_Sy = TRUE,
   solver = "ADMM",
   rho = 1,
   niter = 10000,
   thresh = 1e-04,
+  thresh_0 = 1e-06,
   verbose = FALSE
 )
 }
@@ -39,7 +40,7 @@ cca_group_rrr(
 
 \item{standardize}{Whether to scale variables}
 
-\item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
+\item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)}
 
 \item{solver}{Either "ADMM" or "CVXR"}
 

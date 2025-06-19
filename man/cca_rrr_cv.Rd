@@ -12,9 +12,10 @@ cca_rrr_cv(
   kfolds = 14,
   solver = "ADMM",
   parallelize = FALSE,
-  LW_Sy = FALSE,
+  LW_Sy = TRUE,
   standardize = TRUE,
   rho = 1,
+  thresh_0 = 1e-06,
   niter = 10000,
   thresh = 1e-04,
   verbose = FALSE

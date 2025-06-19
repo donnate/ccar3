@@ -17,6 +17,8 @@ cca_graph_rrr_cv(
   rho = 10,
   niter = 10000,
   thresh = 1e-04,
+  thresh_0 = 1e-06,
+  verbose = FALSE,
   Gamma_dagger = NULL
 )
 }
@@ -45,6 +47,10 @@ cca_graph_rrr_cv(
 
 \item{thresh}{Convergence threshold for ADMM}
 
+\item{thresh_0}{Threshold for small values in the coefficient matrix (default 1e-6)}
+
+\item{verbose}{Whether to print diagnostic output}
+
 \item{Gamma_dagger}{Optional pseudoinverse of Gamma (computed if NULL)}
 
 \item{Sx}{Optional covariance matrix for X. If NULL, computed as t(X) \%*\% X / n}
@@ -52,8 +58,6 @@ cca_graph_rrr_cv(
 \item{Sy}{Optional covariance matrix for Y. If NULL, computed similarly; optionally shrunk via Ledoit-Wolf}
 
 \item{Sxy}{Optional cross-covariance matrix (not currently used)}
-
-\item{verbose}{Whether to print diagnostic output}
 }
 \value{
 A list with elements:

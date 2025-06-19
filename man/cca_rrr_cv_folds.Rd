@@ -17,6 +17,7 @@ cca_rrr_cv_folds(
   rho = 1,
   LW_Sy = TRUE,
   niter = 10000,
+  thresh_0 = 1e-06,
   thresh = 1e-04
 )
 }

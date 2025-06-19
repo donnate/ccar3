@@ -13,7 +13,7 @@ cca_group_rrr_cv(
   kfolds = 5,
   parallelize = FALSE,
   standardize = FALSE,
-  LW_Sy = FALSE,
+  LW_Sy = TRUE,
   solver = "ADMM",
   rho = 1,
   niter = 10000,
@@ -36,7 +36,7 @@ cca_group_rrr_cv(
 
 \item{standardize}{Whether to scale variables}
 
-\item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
+\item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)}
 
 \item{solver}{Either "ADMM" or "CVXR"}
 

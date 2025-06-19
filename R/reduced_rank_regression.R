@@ -3,6 +3,7 @@ library(tidyverse)
 library(Matrix)
 library(glmnet)
 library(gglasso)
+library(SMUT)
 library(rrpack)
 library(foreach)
 library(doParallel)
@@ -18,13 +19,18 @@ compute_sqrt <- function(S, threshold = 1e-4) {
   svd_S$u %*% diag(sapply(svd_S$d, function(x) ifelse(x > threshold, sqrt(x), 0))) %*% t(svd_S$u)
 }
 
+
+matmul = function(A, B){
+  SMUT::eigenMapMatMult(A, B)
+}
+
+
 # Helper: ADMM-based group sparse solver
-solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verbose = FALSE) {
+solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verbose = FALSE, thresh_0 = 1e-6) {
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
   Sx_tot <- Sx
   
-  prod_xy <- t(X) %*% tilde_Y / nrow(X)
   invSx <- solve(Sx_tot + rho * diag(p))
   
   U <- Z <- matrix(0, p, q)
@@ -45,13 +51,13 @@ solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verb
   }
   B_opt <- B
     
-  B_opt[abs(B_opt) < 1e-5] <- 0
+  B_opt[abs(B_opt) < thresh_0] <- 0
   return(B_opt)
 }
 
 
 # Helper: CVXR-based group sparse solver
-solve_rrr_cvxr <- function(X, tilde_Y, lambda) {
+solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
   B <- CVXR::Variable(p, q)
@@ -60,7 +66,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda) {
   result <- CVXR::solve(CVXR::Problem(objective))
   B_opt <- result$getValue(B)
   
-  B_opt[abs(B_opt) < 1e-5] <- 0
+  B_opt[abs(B_opt) < thresh_0] <- 0
   return(B_opt)
 }
 
@@ -82,6 +88,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda) {
 #' @param rho ADMM parameter.
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
+#' @param thresh_0 For the ADMM solver: Set entries whose absolute value is below this to 0 (default 1e-6).
 #' @param verbose Logical for verbose output.
 #'
 #' @return A list with elements:
@@ -96,17 +103,19 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                     lambda = 0, 
                     r, highdim=TRUE, 
                     solver="ADMM",
-                    LW_Sy = FALSE,
+                    LW_Sy = TRUE,
                     standardize = TRUE,
                     rho=1,
                     niter=1e4,
-                    thresh = 1e-4, verbose=FALSE) {
+                    thresh = 1e-4, thresh_0 = 1e-6,
+                    verbose=FALSE) {
   
   n <- nrow(X)
   p <- ncol(X)
   q <- ncol(Y)
 
-  if (q > n) {
+  if (q > p) {
+    print("Swapping X and Y because q > p")
     tmp <- X
     X <- Y
     Y <- tmp
@@ -127,7 +136,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   sqrt_inv_Sy <- compute_sqrt_inv(Sy)
   tilde_Y <- Y %*% sqrt_inv_Sy
   Sx_tot <- Sx
-  Sxy <- crossprod(X, tilde_Y) / n
+  Sxy <- crossprod(X, tilde_Y) / n 
 
   if (!highdim) {
     if(verbose){print("Not using highdim")}
@@ -140,10 +149,11 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   } else {
     if (solver == "CVX") {
       if(verbose){ print("Using CVX solver")}
-      B_opt <- solve_rrr_cvxr(X, tilde_Y, lambda) 
+      B_opt <- solve_rrr_cvxr(X, tilde_Y, lambda, thresh_0=thresh_0) 
     } else if (solver == "ADMM") {
       if(verbose){print("Using ADMM solver")}
-      B_opt <- solve_rrr_admm(X, tilde_Y, Sx, lambda=lambda, rho=rho, niter=niter, thresh=thresh, verbose = FALSE)
+      B_opt <- solve_rrr_admm(X, tilde_Y, Sx, lambda=lambda, rho=rho, niter=niter, thresh=thresh, thresh_0=thresh_0,
+                               verbose = FALSE)
     } else {
       if(verbose){print("Using gglasso solver")}
       fit <- rrpack::cv.srrr(tilde_Y, X, nrank = r, method = "glasso", nfold = 2,
@@ -151,7 +161,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
       B_opt <- fit$coef
     }
 
-    B_opt[abs(B_opt) < 1e-5] <- 0
+    B_opt[abs(B_opt) < thresh_0] <- 0
     active_rows <- which(rowSums(B_opt^2) > 0)
     if (length(active_rows) > r - 1) {
       sqrt_Sx <- compute_sqrt(Sx[active_rows, active_rows])
@@ -211,22 +221,26 @@ cca_rrr_cv <- function(X, Y,
                        kfolds=14,
                        solver="ADMM",
                        parallelize = FALSE,
-                       LW_Sy = FALSE,
+                       LW_Sy = TRUE,
                        standardize=TRUE,
                        rho=1,
+                       thresh_0=1e-6,
                        niter=1e4,
                        thresh = 1e-4, verbose=FALSE) {
 
   X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else Y #scale(Y, scale = FALSE)
   n <- nrow(X)
-  Sx <- crossprod(X) / n
+  Sx = matmul(t(X), X) / n
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose = FALSE)) else crossprod(Y) / n
 
   cv_function <- function(lambda) {
-    cca_rrr_cv_folds(X, Y, Sx=NULL, Sy=NULL, kfolds=kfolds, 
+    cca_rrr_cv_folds(X, Y, Sx=Sx, Sy=NULL, kfolds=kfolds, 
+                  LW_Sy = LW_Sy,
+                  highdim=TRUE,
                   lambda=lambda, r=r, solver=solver, 
-                  standardize=FALSE, rho=rho, niter=niter, thresh=thresh)
+                  standardize=FALSE, rho=rho, niter=niter, thresh=thresh,
+                  thresh_0=thresh_0)
   }
 
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
@@ -236,8 +250,9 @@ cca_rrr_cv <- function(X, Y,
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
   } else {
-    resultsx <- tibble(lambda = lambdas) %>% 
-      mutate(rmse = purrr::map_dbl(lambda, cv_function))
+    resultsx <- data.frame(lambda = lambdas)
+    resultsx$rmse <- sapply(lambdas, cv_function)
+
   }
 
   resultsx <- resultsx %>% 
@@ -248,13 +263,12 @@ cca_rrr_cv <- function(X, Y,
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
 
   final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, lambda=opt_lambda, r=r,
-                   highdim=TRUE, solver=solver,
+                   highdim=TRUE, solver=solver, highdim = TRUE,
                    standardize=FALSE, LW_Sy=LW_Sy, rho=rho, niter=niter, 
-                   thresh=thresh, verbose=verbose)
+                   thresh=thresh, thresh_0=thresh_0,verbose=verbose)
 
-  sqrt_inv_Sy <- compute_sqrt_inv(Sy)
   list(U = final$U, 
-       V = sqrt_inv_Sy %*% final$V,
+       V = final$V,
        lambda = opt_lambda,
        #resultsx = resultsx,
        rmse = resultsx$rmse,
@@ -274,22 +288,28 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                           rho=1,
                           LW_Sy = TRUE,
                           niter=1e4,
+                          thresh_0=1e-6,
                           thresh = 1e-4) {
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
 
-  no_cores <- parallel::detectCores() - 2
-  doParallel::registerDoParallel(cores=no_cores) 
+  rmse <- foreach(i = seq_along(folds), .combine = c) %do% { 
 
-  rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('CVXR', 'Matrix')) %dopar% {
-    X_train <- X[-folds[[i]], ]
-    Y_train <- Y[-folds[[i]], ]
-    X_val <- X[folds[[i]], ]
-    Y_val <- Y[folds[[i]], ]
+    n <- nrow(X)
+    X_train <- X[-folds[[i]], ]; Y_train <- Y[-folds[[i]], ]
+    X_val <- X[folds[[i]], ]; Y_val <- Y[folds[[i]], ]
+    n_train <- n - nrow(X_val)
+
+    if (is.null(Sx) == FALSE) {
+      Sx_train <- (n * Sx - crossprod(X_val)) / n_train
+    } else {
+      Sx_train <- NULL
+    }
 
     tryCatch({
-      final <- cca_rrr(X_train, Y_train, Sx=NULL, Sy=NULL, highdim=TRUE,
+      final <- cca_rrr(X_train, Y_train, Sx=Sx_train, Sy=NULL, highdim=TRUE,
                        lambda=lambda, r=r, solver=solver,
-                       LW_Sy=LW_Sy, standardize=FALSE, rho=rho, niter=niter, thresh=thresh,
+                       LW_Sy=LW_Sy, standardize=FALSE, rho=rho, niter=niter, 
+                       thresh=thresh,thresh_0=thresh_0,
                        verbose=FALSE)
       mean((X_val %*% final$U - Y_val %*% final$V)^2)
     }, error = function(e) {
