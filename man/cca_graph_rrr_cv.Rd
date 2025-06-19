@@ -12,7 +12,7 @@ cca_graph_rrr_cv(
   lambdas = 10^seq(-3, 1.5, length.out = 10),
   kfolds = 5,
   parallelize = FALSE,
-  standardize = FALSE,
+  standardize = TRUE,
   LW_Sy = FALSE,
   rho = 10,
   niter = 10000,

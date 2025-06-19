@@ -7,8 +7,16 @@ library(rrpack)
 library(foreach)
 library(doParallel)
 library(CVXR)
+library(SMUT) # Required for eigenMapMatMult
+library(pracma) # Required for pinv
 library(caret) # Required for createFolds
 library(parallel) # Required for detectCores
+
+
+matmul = function(A, B){
+  SMUT::eigenMapMatMult(A, B)
+}
+
 
 cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                                 Sx = NULL, Sy = NULL, kfolds = 5,
@@ -19,25 +27,33 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                                 Gamma_dagger = NULL) {
   
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
-  no_cores <-parallel::detectCores() - 2
-  doParallel::registerDoParallel(cores = no_cores)
 
-  rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('CVXR', 'Matrix')) %dopar% {
+  rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('CVXR', 'Matrix')) %do% {
+    n_full <- nrow(X)
     X_train <- X[-folds[[i]], ]
     Y_train <- Y[-folds[[i]], ]
     X_val <- X[folds[[i]], ]
     Y_val <- Y[folds[[i]], ]
+
+   # We don't even need to create X_train and Y_train explicitly for the covariance calculation
+    n_train <- n_full - nrow(X_val)
+
+    # --- DOWNDATE TRICK ---
+    Sx_train <- (n_full * Sx - crossprod(X_val)) / n_train
+    Sy_train <- (n_full * Sy - crossprod(Y_val)) / n_train
+
+
     
     tryCatch({
       fit <- cca_graph_rrr(X_train, Y_train, Gamma,
-                           Sx, Sy, lambda, r,
+                           Sx_train, Sy_train, lambda, r,
                            standardize, 
                            LW_Sy, rho, niter, thresh,
                            Gamma_dagger)
 
       mean((X_val %*% fit$U - Y_val %*% fit$V)^2)
     }, error = function(e) {
-      message("An error occurred in fold ", i)
+      message("Error in fold ", i, ": ", conditionMessage(e))
       return(NA)
     })
   }
@@ -66,6 +82,7 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
 #' @param rho ADMM penalty parameter
 #' @param niter Maximum number of ADMM iterations
 #' @param thresh Convergence threshold for ADMM
+#' @param thresh_0 Threshold for small values in the coefficient matrix (default 1e-6)
 #' @param verbose Whether to print diagnostic output
 #' @param Gamma_dagger Optional pseudoinverse of Gamma (computed if NULL)
 #'
@@ -86,6 +103,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
                              kfolds = 5, parallelize = FALSE,
                              standardize = TRUE, LW_Sy = FALSE,
                              rho = 10, niter = 1e4, thresh = 1e-4,
+                             thresh_0 = 1e-6, verbose = FALSE,
                              Gamma_dagger = NULL) {
 
   if (nrow(X) < min(ncol(X), ncol(Y))) {
@@ -97,6 +115,10 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
     Y <- scale(Y)
   } 
 
+  n <- nrow(X) # Define n
+  Sx <- crossprod(X) / n # Pre-compute full Sx
+  Sy <- crossprod(Y) / n # Pre-compute full Sy
+
 
 
   run_cv <- function(lambda) {
@@ -107,6 +129,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
                                  standardize = FALSE,
                                  LW_Sy = LW_Sy, rho = rho,
                                  niter = niter, thresh = thresh,
+                                 thresh_0 = thresh_0,
                                  Gamma_dagger = Gamma_dagger)
     data.frame(lambda = lambda, rmse = rmse)
   }
@@ -128,7 +151,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
                          lambda = opt_lambda, r = r,
                          standardize = FALSE,
                          LW_Sy = LW_Sy, rho = rho, niter = niter,
-                         thresh = thresh, Gamma_dagger = Gamma_dagger)
+                         thresh = thresh, Gamma_dagger = Gamma_dagger, thresh_0=thresh_0)
 
   list(
     U = final$U,
@@ -161,6 +184,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
 #' @param niter Maximum number of ADMM iterations
 #' @param thresh Convergence threshold for ADMM
 #' @param verbose Whether to print diagnostic output
+#' @param thresh_0 Threshold for small values in the coefficient matrix (default 1e-6)
 #' @param Gamma_dagger Optional pseudoinverse of Gamma (computed if NULL)
 #'
 #' @return A list with elements:
@@ -175,16 +199,17 @@ cca_graph_rrr <- function(X, Y, Gamma,
                           Sx = NULL, Sy = NULL, Sxy = NULL,
                           lambda = 0, r,
                           standardize = FALSE, 
-                          LW_Sy = FALSE, rho = 10,
+                          LW_Sy = TRUE, rho = 10,
                           niter = 1e4, thresh = 1e-4,
+                          thresh_0 = 1e-6,
                           verbose = FALSE, Gamma_dagger = NULL) {
   n <- nrow(X)
   p <- ncol(X)
   q <- ncol(Y)
 
-  if (q > n) {
-    tmp <- X; X <- Y; Y <- tmp
-  }
+if (q > n) {
+  stop("The X/Y swapping heuristic (for q > n) is not compatible with the graph constraint Gamma. Swap X and Y in your arguments.")
+}
 
   if (standardize) {
     X <- scale(X)
@@ -232,7 +257,8 @@ cca_graph_rrr <- function(X, Y, Gamma,
   Z <- matrix(0, new_p, q)
 
   for (i in seq_len(niter)) {
-    U_old <- U; Z_old <- Z
+    U_old <- U; 
+    Z_old <- Z
 
     B <- invSx %*% (prod_xy + rho * (Z - U))
     Z <- B + U
@@ -254,7 +280,7 @@ cca_graph_rrr <- function(X, Y, Gamma,
 
   # Reconstruct full coefficient matrix
   B_opt <- Gamma_dagger %*% B + Pi %*% Projection
-  B_opt[abs(B_opt) < 1e-5] <- 0
+  B_opt[abs(B_opt) < thresh_0] <- 0
 
   # Final CCA step: SVD of transformed coefficient matrix
   svd_Sx <- svd(Sx_tot)

@@ -10,6 +10,7 @@ ecca.cv(
   lambdas = 0,
   groups = NULL,
   r = 2,
+  standardize = F,
   rho = 1,
   B0 = NULL,
   nfold = 5,
