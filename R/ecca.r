@@ -89,7 +89,7 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   
   if(is.null(B0)) B = matrix(0, p, q)
   else B = B0
-
+  
   
   EDx = eigen(Sx, symmetric = T)
   EDy = eigen(Sy, symmetric = T)
@@ -107,82 +107,82 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   U = list()
   V = list()
   
-       
-    
+  
+  
   # Step 1: ADMM
   H = matrix(0, p, q)
   Z = B
   iter = 0
   delta = Inf
-
+  
   while(delta > eps && iter < maxiter){
-        iter = iter + 1
-        
-        # Update B
-        
-        B0 = B
-        Btilde = B1 + rho * (t(Ux) %*% ( Z - H) %*% Uy) 
-        Btilde = Btilde / b
-        B = ((Ux %*% Btilde) %*% t(Uy))
-        
-        # Update Z
-        
-        Z = B + H
-        if(is.null(groups)){
-        Z = soft_thresh(Z, lambda / rho)
-        }
-        else{
-        for (g in 1:length(groups)){
-        Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
-        }
-        }
-        
-        # Update H
-        
-        H = H + rho * (B - Z)
-
-        sB0 <- sum(B0^2)
-        if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
-          delta <- sum((B - B0)^2) / sB0
-        } else {
-          delta <- Inf
-        }
-
-        
-        #if(fnorm(B0) > 0) delta = fnorm(B - B0)^2 / fnorm(B0)^2
-        if(verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
-    }
-    if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
-    else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
-
-    # Step 2: map back
-
-    B = Z
-    C = matmul(matmul(Sx12, B), Sy12) 
-
-    # SVD = svd(C)
-    # U0 = SVD$u[, 1:r, drop = F]
-    # V0 = SVD$v[, 1:r, drop = F]
-    # L0 = SVD$d[1:r]
-
-    SVD = RSpectra::svds(C, r)
-    U0 = SVD$u
-    V0 = SVD$v
-    L0 = SVD$d
-
-    inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
-
-    if(max(L0) > 1e-8){
-        U = matmul(matmul(matmul(B, Sy12),V0), diag(inv_L0, nrow = length(L0)))
-        V = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
-        return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = diag(matmul(t(U), matmul(Sxy, V)))))
-    } else{
-        U = matrix(NA, p, r)
-        V = matrix(NA, q, r)
-        return(list(U = U, V = V, loss = mean(apply((matmul(X, U) - matmul(Y,V))^2,2,sum)), cor = rep(0, r)))
-    }
-
+    iter = iter + 1
     
+    # Update B
+    
+    B0 = B
+    Btilde = B1 + rho * (t(Ux) %*% ( Z - H) %*% Uy) 
+    Btilde = Btilde / b
+    B = ((Ux %*% Btilde) %*% t(Uy))
+    
+    # Update Z
+    
+    Z = B + H
+    if(is.null(groups)){
+      Z = soft_thresh(Z, lambda / rho)
+    }
+    else{
+      for (g in 1:length(groups)){
+        Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
+      }
+    }
+    
+    # Update H
+    
+    H = H + rho * (B - Z)
+    
+    sB0 <- sum(B0^2)
+    if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
+      delta <- sum((B - B0)^2) / sB0
+    } else {
+      delta <- Inf
+    }
+    
+    
+    #if(fnorm(B0) > 0) delta = fnorm(B - B0)^2 / fnorm(B0)^2
+    if(verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
+  }
+  if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
+  else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
+  
+  # Step 2: map back
+  
+  B = Z
+  C = matmul(matmul(Sx12, B), Sy12) 
+  
+  # SVD = svd(C)
+  # U0 = SVD$u[, 1:r, drop = F]
+  # V0 = SVD$v[, 1:r, drop = F]
+  # L0 = SVD$d[1:r]
+  
+  SVD = RSpectra::svds(C, r)
+  U0 = SVD$u
+  V0 = SVD$v
+  L0 = SVD$d
+  
+  inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
+  
+  if(max(L0) > 1e-8){
+    U = matmul(matmul(matmul(B, Sy12),V0), diag(inv_L0, nrow = length(L0)))
+    V = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
+    return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = diag(matmul(t(U), matmul(Sxy, V)))))
+  } else{
+    U = matrix(NA, p, r)
+    V = matrix(NA, q, r)
+    return(list(U = U, V = V, loss = mean(apply((matmul(X, U) - matmul(Y,V))^2,2,sum)), cor = rep(0, r)))
+  }
+  
+  
 }
 
 
@@ -190,20 +190,20 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
 
 
 ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NULL,
-                Sy = NULL, Sxy = NULL, standardize = T, 
-                rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = T){
+                               Sy = NULL, Sxy = NULL, standardize = T, 
+                               rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = T){
   
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
-
-    ##### Need to make sure that they are centered
+  
+  ##### Need to make sure that they are centered
   if (standardize) {
     X = scale(X)
     Y = scale(Y)
   } 
-
-
+  
+  
   
   if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
   if (is.null(Sx)) Sx = matmul(t(X), X) / n
@@ -213,7 +213,7 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
   
   if(is.null(B0)) B = matrix(0, p, q)
   else B = B0
-
+  
   
   EDx = eigen(Sx, symmetric = T)
   EDy = eigen(Sy, symmetric = T)
@@ -234,7 +234,7 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
   
   for(i in 1:length(lambdas)) {
     lambda = lambdas[[i]]
-   
+    
     # Step 1: ADMM
     
     Z = B
@@ -258,20 +258,20 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
         Z = soft_thresh(Z, lambda / rho)
       }
       else{
-      for (g in 1:length(groups)){
-        Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
-      }
+        for (g in 1:length(groups)){
+          Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
+        }
       }
       
       # Update H
       
       H = H + rho * (B - Z)
-      
+      sB0 <- sum(B0^2) 
       if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
-          delta <- sum((B - B0)^2) / sB0
-        } else {
-          delta <- Inf
-        }
+        delta <- sum((B - B0)^2) / sB0
+      } else {
+        delta <- Inf
+      }
       if(verbose && iter %% 10 == 0) cat("\niter:", iter,  "delta:", delta)
     }
     if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
@@ -286,15 +286,15 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
     # U0 = SVD$u[, 1:r, drop = F]
     # V0 = SVD$v[, 1:r, drop = F]
     # L0 = SVD$d[1:r]
-
+    
     SVD = RSpectra::svds(C, r)
     U0 = SVD$u
     V0 = SVD$v
     L0 = SVD$d
-
-
+    
+    
     inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
-
+    
     if(max(L0) > 1e-8){
       U[[i]] = matmul(matmul(matmul(B, Sy12),V0), diag(inv_L0, nrow = length(L0)))
       V[[i]] = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
@@ -311,143 +311,176 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
 
 ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2, 
                      standardize = T, Sx = NULL, Sy = NULL, Sxy = NULL,
-                    rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
-                    maxiter = 500, verbose = T, parallel = T){
+                     rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
+                     maxiter = 500, verbose = T, parallel = T){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
-
-  ##### Need to make sure that they are centered
-  if (standardize) {
-    X = scale(X)
-    Y = scale(Y)
-  } 
-  if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
-  if (is.null(Sx)) Sx = matmul(t(X), X) /
-  if (is.null(Sy)) {
-    Sy = matmul(t(Y), Y) / n
-  }
-
-
-
-  
-  ## Create folds
-  set.seed(1234)
-  folds = caret::createFolds(1:n, k = nfold, list = T)
-  n_success = nfold
-  ## Choose penalty lambda
-  results <- data.frame(lambda = numeric(), mse = numeric(), se = numeric())
-  
-  ## Cross validation
-      if(parallel){
-        registerDoParallel(parallel::makeCluster(parallel::detectCores() - 2, type = "PSOCK"))
-        ## Parallel cross validation
-        cv = foreach(fold = folds, 
-                     .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), 
-                     .packages = c("SMUT", "rARPACK", "crayon"),
-                     .errorhandling = 'pass') %dopar% {
-
-              n_full <- nrow(X)
-              X_train <- X[-fold, ]
-              Y_train <- Y[-fold, ]
-              X_val <- X[fold, ]
-              Y_val <- Y[fold, ]
-
-            # We don't even need to create X_train and Y_train explicitly for the covariance calculation
-              n_train <- n_full - nrow(X_val)
-
-              # --- DOWNDATE TRICK ---
-              Sx_train <- (n_full * Sx - crossprod(X_val)) / n_train
-              Sy_train <- (n_full * Sy - crossprod(Y_val)) / n_train
-              Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
-          
-          ## Fit lasso model
-          ECCA = ecca_across_lambdas(X[-fold,,drop = F], Y[-fold,,drop = F], 
-                                     Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
-                                     lambdas, groups, r, rho, B0, eps, maxiter, verbose = verbose)
-          
-          ## Evaluate on test set
-          scores = rep(0, length(lambdas))
-          for(i in 1:length(lambdas)){
-            if(length(lambdas) > 1){
-              U = (ECCA$U)[[i]]
-              V = (ECCA$V)[[i]]
-            } else {
-              U = ECCA$U
-              V = ECCA$V
-            }
-            if(!is.null(U)) scores[i] = mean((matmul(X[fold,], U) - matmul(Y[fold,], V))^2)
-            else scores[i] = Inf
-          }
-          return(scores)
+  if (n < 2 * nfold) {
+    cat(crayon::yellow(paste0("\nWarning: Sample size (n=", n, ") is too small for ", nfold, "-fold CV. Skipping CV and fitting with the first lambda value.")))
+    lambda.min = lambdas[1]
+    lambda.1se =lambdas[1]
+    scores = NULL
+  } else {
+    
+    ##### Need to make sure that they are centered
+    if (standardize) {
+      X = scale(X)
+      Y = scale(Y)
+    } 
+    if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
+    if (is.null(Sx)) Sx = matmul(t(X), X) /n
+        if (is.null(Sy)) {
+          Sy = matmul(t(Y), Y) / n
         }
-        # Stop the cluster when done
-
-        parallel::stopImplicitCluster()
-
-        # --- Post-processing to handle potential errors ---
-        # Identify which folds resulted in an error
-        is_error <- sapply(cv, function(x) inherits(x, "error"))
-
-        if(any(is_error)){
-          warning(paste(sum(is_error), "out of", nfold, "folds failed during cross-validation."))
-          # Optional: print the actual error messages for debugging
-          # print(cv_results_list[is_error])
-        }
-
-        # Filter out the errors and combine the successful results
-        successful_results <- cv[!is_error]
+    
+    
+    
+    
+    ## Create folds
+    set.seed(1234)
+    print("n is")
+    print(n)
+    print("nfold is")
+    print(nfold)
+    
+    folds = caret::createFolds(1:n, k = nfold, list = T)
+    n_success = nfold
+    ## Choose penalty lambda
+    results <- data.frame(lambda = numeric(), mse = numeric(), se = numeric())
+    
+    ## Cross validation
+    if(parallel){
+      registerDoParallel(parallel::makeCluster(parallel::detectCores() - 2, type = "PSOCK"))
+      ## Parallel cross validation
+      cv = foreach(fold = folds, 
+                   .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), 
+                   .packages = c("SMUT", "rARPACK", "crayon"),
+                   .errorhandling = 'pass') %dopar% {
+                     
+                     n_full <- nrow(X)
+                     X_train <- X[-fold, ]
+                     Y_train <- Y[-fold, ]
+                     X_val <- X[fold, ]
+                     Y_val <- Y[fold, ]
+                     
+                     # We don't even need to create X_train and Y_train explicitly for the covariance calculation
+                     n_train <- n_full - nrow(X_val)
+                     
+                     # --- DOWNDATE TRICK ---
+                     Sx_train <- (n_full * Sx - crossprod(X_val)) / n_train
+                     Sy_train <- (n_full * Sy - crossprod(Y_val)) / n_train
+                     Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
+                     
+                     ## Fit lasso model
+                     ECCA = ecca_across_lambdas(X[-fold,,drop = F], Y[-fold,,drop = F], 
+                                                Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
+                                                standardize = F,
+                                                lambdas=lambdas, groups=groups, r=r, rho=rho, 
+                                                B0=B0, eps=eps, maxiter=maxiter, verbose = verbose)
+                     
+                     ## Evaluate on test set
+                     scores = rep(0, length(lambdas))
+                     for(i in 1:length(lambdas)){
+                       if(length(lambdas) > 1){
+                         U = (ECCA$U)[[i]]
+                         V = (ECCA$V)[[i]]
+                       } else {
+                         U = ECCA$U
+                         V = ECCA$V
+                       }
+                       
+                       X_val_mat <- X[fold, , drop = FALSE]
+                       Y_val_mat <- Y[fold, , drop = FALSE]
+                       
+                       #if(is.na(U)) scores[i] = NA
+                       if(!is.null(U) && !any(is.na(U))) {
+                         scores[i] = mean((matmul(X_val_mat, U) - Y_val_mat %*%V)^2)
+                       } else {
+                         scores[i] = Inf
+                       }
+            
+                     }
+                     return(scores)
+                   }
+      # Stop the cluster when done
+      
+      parallel::stopImplicitCluster()
+      
+      # --- Post-processing to handle potential errors ---
+      # Identify which folds resulted in an error
+      is_error <- sapply(cv, function(x) inherits(x, "error"))
+      
+      if(any(is_error)){
+        warning(paste(sum(is_error), "out of", nfold, "folds failed during cross-validation."))
+        # Optional: print the actual error messages for debugging
+        # print(cv_results_list[is_error])
+      }
+      
+      # Filter out the errors and combine the successful results
+      successful_results <- cv[!is_error]
+      
+      # If all folds failed, we can't proceed
+      if(length(successful_results) == 0) {
+        stop("All CV folds failed. Cannot select a lambda.")
+      }
+      
+      scores.cv = do.call(cbind, successful_results)
+      n_success <- length(successful_results)
+    } else {
+      scores.cv = c()
+      for(i in 1:length(folds)){
         
-        # If all folds failed, we can't proceed
-        if(length(successful_results) == 0) {
-          stop("All CV folds failed. Cannot select a lambda.")
+        if(verbose) print(paste0("\n\nfold:", i))
+        fold = folds[[i]]
+        
+        n_full <- nrow(X)
+        X_train <- X[-fold, ]
+        Y_train <- Y[-fold, ]
+        X_val <- X[fold, ]
+        Y_val <- Y[fold, ]
+        
+        # We don't even need to create X_train and Y_train explicitly for the covariance calculation
+        n_train <- n_full - nrow(X_val)
+        
+        # --- DOWNDATE TRICK ---
+        Sx_train <- (n_full * Sx - crossprod(X_val)) / n_train
+        Sy_train <- (n_full * Sy - crossprod(Y_val)) / n_train
+        Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
+        
+        
+        ## Fit lasso model
+        ECCA = ecca_across_lambdas(X[-fold,,drop = F], Y[-fold,,drop = F], 
+                                   Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
+                                   standardize = F,
+                                   lambdas = lambdas, groups = groups, r = r, 
+                                   rho = rho, B0 = B0, eps= eps, maxiter = maxiter, verbose = verbose)
+        
+        ## Evaluate on test set
+        scores = rep(0, length(lambdas))
+        for(i in 1:length(lambdas)){
+          if(length(lambdas) > 1){
+            U = (ECCA$U)[[i]]
+            V = (ECCA$V)[[i]]
+          } else {
+            U = ECCA$U
+            V = ECCA$V
+          }
+          #if(is.na(U)) scores[i] = NA
+          #if(is.na(U)) scores[i] = NA
+          X_val_mat <- X[fold, , drop = FALSE]
+          Y_val_mat <- Y[fold, , drop = FALSE]
+          
+          if(!is.null(U) && !any(is.na(U))) {
+            scores[i] = mean((matmul(X_val_mat, U) - Y_val_mat %*%V)^2)
+          } else {
+            scores[i] = Inf
+          }
+          
         }
-
-        scores.cv = do.call(cbind, successful_results)
-        n_success <- length(successful_results)
-      } else {
-        scores.cv = c()
-        for(i in 1:length(folds)){
-            
-            if(verbose) print(paste0("\n\nfold:", i))
-            fold = folds[[i]]
-
-              n_full <- nrow(X)
-              X_train <- X[-fold, ]
-              Y_train <- Y[-fold, ]
-              X_val <- X[fold, ]
-              Y_val <- Y[fold, ]
-
-            # We don't even need to create X_train and Y_train explicitly for the covariance calculation
-              n_train <- n_full - nrow(X_val)
-
-              # --- DOWNDATE TRICK ---
-              Sx_train <- (n_full * Sx - crossprod(X_val)) / n_train
-              Sy_train <- (n_full * Sy - crossprod(Y_val)) / n_train
-              Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
-
-            
-            ## Fit lasso model
-            ECCA = ecca_across_lambdas(X[-fold,,drop = F], Y[-fold,,drop = F], 
-                                        Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
-                                        lambdas, groups, r, rho, B0, eps, maxiter, verbose = verbose)
-            
-            ## Evaluate on test set
-            scores = rep(0, length(lambdas))
-            for(i in 1:length(lambdas)){
-              if(length(lambdas) > 1){
-                U = (ECCA$U)[[i]]
-                V = (ECCA$V)[[i]]
-              } else {
-                U = ECCA$U
-                V = ECCA$V
-              }
-              #if(is.na(U)) scores[i] = NA
-              scores[i] = mean((matmul(X[fold,], U) - matmul(Y[fold,] , V))^2)
-            }
-            if(verbose) print(paste("\n\nMSEs:", scores))
-            scores.cv = cbind(scores.cv, scores)
-        }
+        if(verbose) print(paste("\n\nMSEs:", scores))
+        scores.cv = cbind(scores.cv, scores)
+      }
     }
     scores = data.frame(lambda = lambdas, mse = rowMeans(scores.cv), 
                         se = matrixStats::rowSds(scores.cv)/sqrt(n_success))
@@ -461,7 +494,8 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
     lambda.min = scores %>% slice(which.min(mse)) %>% pull(lambda)
     upper = scores %>% slice(which.min(mse)) %>% mutate(upper = mse + se) %>% pull(upper)
     lambda.1se = scores %>% filter(mse <= upper) %>% pull(lambda) %>% max()
-    return(list(scores = scores, lambda.min = lambda.min, lambda.1se = lambda.1se))
+  }
+  return(list(scores = scores, lambda.min = lambda.min, lambda.1se = lambda.1se))
 }
 
 #' Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensional, with Cross-Validation
@@ -492,12 +526,12 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
 #' }
 #' @export
 ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
-                 rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
-                 verbose = F, parallel = F){
+                   rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
+                   verbose = F, parallel = F){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
-
+  
   if (standardize) {
     X = scale(X)
     Y = scale(Y)
@@ -505,7 +539,9 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
   
   # Select lambda
   if(length(lambdas) > 1){
-    eval = ecca.eval(X, Y, lambdas, groups, r, rho, B0, nfold, eps, maxiter, verbose, parallel)
+    eval = ecca.eval(X, Y, lambdas=lambdas, groups=groups, r=r, rho=rho,
+                     standardize = F,
+                     B0 = B0, nfold=nfold, eps=eps,  maxiter=maxiter, verbose=verbose, parallel= parallel)
     if(select == "lambda.1se") lambda.opt = eval$lambda.1se
     else lambda.opt = eval$lambda.min
   } else {

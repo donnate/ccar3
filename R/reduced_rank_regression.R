@@ -34,7 +34,7 @@ solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verb
   invSx <- solve(Sx_tot + rho * diag(p))
   
   U <- Z <- matrix(0, p, q)
-
+  
   prod_xy <- crossprod(X, tilde_Y) / n
   invSx <- solve(Sx_tot + rho * diag(p))
   for (i in seq_len(niter)) {
@@ -50,7 +50,7 @@ solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verb
     if (max(c(norm(Z - B) / sqrt(p), norm(Z_old - Z) / sqrt(p))) < thresh) break
   }
   B_opt <- B
-    
+  
   B_opt[abs(B_opt) < thresh_0] <- 0
   return(B_opt)
 }
@@ -61,7 +61,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
   B <- CVXR::Variable(p, q)
-
+  
   objective <- CVXR::Minimize(1 / n * CVXR::sum_squares(tilde_Y - X %*% B) + lambda * sum(CVXR::norm2(B, axis = 1)))
   result <- CVXR::solve(CVXR::Problem(objective))
   B_opt <- result$getValue(B)
@@ -113,7 +113,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   n <- nrow(X)
   p <- ncol(X)
   q <- ncol(Y)
-
+  
   if (q > p) {
     print("Swapping X and Y because q > p")
     tmp <- X
@@ -123,21 +123,21 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
     p <- q
     q <- tmp
   }
-
+  
   X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else Y # scale(Y, scale = FALSE)
-
+  
   if (is.null(Sx)) Sx <- crossprod(X) / n
   if (is.null(Sy)) {
     Sy <- crossprod(Y) / n
     if (LW_Sy) Sy <- as.matrix(corpcor::cov.shrink(Y, verbose=verbose))
   }
-
+  
   sqrt_inv_Sy <- compute_sqrt_inv(Sy)
   tilde_Y <- Y %*% sqrt_inv_Sy
   Sx_tot <- Sx
   Sxy <- crossprod(X, tilde_Y) / n 
-
+  
   if (!highdim) {
     if(verbose){print("Not using highdim")}
     B_OLS <- solve(Sx_tot, Sxy)
@@ -153,14 +153,14 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
     } else if (solver == "ADMM") {
       if(verbose){print("Using ADMM solver")}
       B_opt <- solve_rrr_admm(X, tilde_Y, Sx, lambda=lambda, rho=rho, niter=niter, thresh=thresh, thresh_0=thresh_0,
-                               verbose = FALSE)
+                              verbose = FALSE)
     } else {
       if(verbose){print("Using gglasso solver")}
       fit <- rrpack::cv.srrr(tilde_Y, X, nrank = r, method = "glasso", nfold = 2,
-                     modstr = list("lamA" = rep(lambda, 10), "nlam" = 10))
+                             modstr = list("lamA" = rep(lambda, 10), "nlam" = 10))
       B_opt <- fit$coef
     }
-
+    
     B_opt[abs(B_opt) < thresh_0] <- 0
     active_rows <- which(rowSums(B_opt^2) > 0)
     if (length(active_rows) > r - 1) {
@@ -174,10 +174,10 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
       V <- matrix(0, q, r)
     }
   }
-
+  
   loss <- mean((Y %*% V - X %*% U)^2)
   canon_corr <- sapply(seq_len(r), function(i) cov(X %*% U[, i], Y %*% V[, i]))
-
+  
   list(U = U, V = V, loss = loss, cor = canon_corr)
 }
 
@@ -196,7 +196,6 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param kfolds Number of folds for cross-validation.
 #' @param lambdas Sequence of lambda values for cross-validation.
 #' @param parallelize Logical; should cross-validation be parallelized?
-#' @param highdim Boolean for high-dimensional regime.
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
 #' @param standardize Logical; should X and Y be scaled.
@@ -227,22 +226,21 @@ cca_rrr_cv <- function(X, Y,
                        thresh_0=1e-6,
                        niter=1e4,
                        thresh = 1e-4, verbose=FALSE) {
-
+  
   X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else Y #scale(Y, scale = FALSE)
   n <- nrow(X)
   Sx = matmul(t(X), X) / n
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose = FALSE)) else crossprod(Y) / n
-
+  
   cv_function <- function(lambda) {
     cca_rrr_cv_folds(X, Y, Sx=Sx, Sy=NULL, kfolds=kfolds, 
-                  LW_Sy = LW_Sy,
-                  highdim=TRUE,
-                  lambda=lambda, r=r, solver=solver, 
-                  standardize=FALSE, rho=rho, niter=niter, thresh=thresh,
-                  thresh_0=thresh_0)
+                     LW_Sy = LW_Sy,
+                     lambda=lambda, r=r, solver=solver, 
+                     standardize=FALSE, rho=rho, niter=niter, thresh=thresh,
+                     thresh_0=thresh_0)
   }
-
+  
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
     no_cores <- parallel::detectCores() - 2
     doParallel::registerDoParallel(cores=no_cores)
@@ -252,21 +250,21 @@ cca_rrr_cv <- function(X, Y,
   } else {
     resultsx <- data.frame(lambda = lambdas)
     resultsx$rmse <- sapply(lambdas, cv_function)
-
+    
   }
-
+  
   resultsx <- resultsx %>% 
     mutate(rmse = ifelse(is.na(rmse) | rmse == 0, 1e8, rmse)) %>%
     filter(rmse > 1e-5)
-
+  
   opt_lambda <- resultsx$lambda[which.min(resultsx$rmse)]
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
-
+  
   final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, lambda=opt_lambda, r=r,
-                   highdim=TRUE, solver=solver, highdim = TRUE,
+                   highdim=TRUE, solver=solver,
                    standardize=FALSE, LW_Sy=LW_Sy, rho=rho, niter=niter, 
                    thresh=thresh, thresh_0=thresh_0,verbose=verbose)
-
+  
   list(U = final$U, 
        V = final$V,
        lambda = opt_lambda,
@@ -281,30 +279,30 @@ cca_rrr_cv <- function(X, Y,
 #'
 #' @return Average RMSE across folds.
 cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
-                          lambda=0.01,
-                          r=2,
-                          standardize=FALSE,
-                          solver = "ADMM",
-                          rho=1,
-                          LW_Sy = TRUE,
-                          niter=1e4,
-                          thresh_0=1e-6,
-                          thresh = 1e-4) {
+                             lambda=0.01,
+                             r=2,
+                             standardize=FALSE,
+                             solver = "ADMM",
+                             rho=1,
+                             LW_Sy = TRUE,
+                             niter=1e4,
+                             thresh_0=1e-6,
+                             thresh = 1e-4) {
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
-
+  
   rmse <- foreach(i = seq_along(folds), .combine = c) %do% { 
-
+    
     n <- nrow(X)
     X_train <- X[-folds[[i]], ]; Y_train <- Y[-folds[[i]], ]
     X_val <- X[folds[[i]], ]; Y_val <- Y[folds[[i]], ]
     n_train <- n - nrow(X_val)
-
+    
     if (is.null(Sx) == FALSE) {
       Sx_train <- (n * Sx - crossprod(X_val)) / n_train
     } else {
       Sx_train <- NULL
     }
-
+    
     tryCatch({
       final <- cca_rrr(X_train, Y_train, Sx=Sx_train, Sy=NULL, highdim=TRUE,
                        lambda=lambda, r=r, solver=solver,
@@ -317,7 +315,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
       NA
     })
   }
-
+  
   if (mean(is.na(rmse)) == 1) return(1e8)
   mean(rmse, na.rm = TRUE)
 }
