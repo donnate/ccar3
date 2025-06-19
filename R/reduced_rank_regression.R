@@ -113,17 +113,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   n <- nrow(X)
   p <- ncol(X)
   q <- ncol(Y)
-  
-  if (q > p) {
-    print("Swapping X and Y because q > p")
-    tmp <- X
-    X <- Y
-    Y <- tmp
-    tmp <- p
-    p <- q
-    q <- tmp
-  }
-  
+
   X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else Y # scale(Y, scale = FALSE)
   
@@ -213,6 +203,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #'   \item{cor}{Canonical correlations}
 #' }
 #' @importFrom foreach foreach %dopar%
+#' @importFrom foreach foreach %do%
 #' @export
 cca_rrr_cv <- function(X, Y, 
                        r=2, 
