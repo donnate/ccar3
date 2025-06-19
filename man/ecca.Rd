@@ -10,6 +10,7 @@ ecca(
   lambda = 0,
   groups = NULL,
   r = 2,
+  standardize = F,
   rho = 1,
   B0 = NULL,
   eps = 1e-04,
@@ -28,6 +29,8 @@ ecca(
 
 \item{r}{Target rank}
 
+\item{standardize}{Whether to scale variables}
+
 \item{rho}{ADMM parameter}
 
 \item{B0}{Initial value for the coefficient matrix (optional)}
@@ -37,8 +40,6 @@ ecca(
 \item{maxiter}{Maximum number of ADMM iterations}
 
 \item{verbose}{Print diagnostics}
-
-\item{do.scale}{Whether to scale variables}
 }
 \value{
 A list with elements:

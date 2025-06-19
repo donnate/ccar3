@@ -12,7 +12,7 @@ cca_rrr_cv_folds(
   kfolds = 5,
   lambda = 0.01,
   r = 2,
-  standardize = TRUE,
+  standardize = FALSE,
   solver = "ADMM",
   rho = 1,
   LW_Sy = TRUE,
