@@ -351,7 +351,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
     
     ## Cross validation
     if(parallel){
-      registerDoParallel(parallel::makeCluster(parallel::detectCores() - 2, type = "PSOCK"))
+      doParallel::registerDoParallel(parallel::makeCluster(parallel::detectCores() - 2, type = "PSOCK"))
       ## Parallel cross validation
       cv = foreach(fold = folds, 
                    .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), 
@@ -405,7 +405,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                    }
       # Stop the cluster when done
       
-      parallel::stopImplicitCluster()
+      doParallel::stopImplicitCluster()
       
       # --- Post-processing to handle potential errors ---
       # Identify which folds resulted in an error
