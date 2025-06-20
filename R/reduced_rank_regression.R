@@ -113,7 +113,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   n <- nrow(X)
   p <- ncol(X)
   q <- ncol(Y)
-
+  
   X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else Y # scale(Y, scale = FALSE)
   
@@ -166,7 +166,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   }
   
   loss <- mean((Y %*% V - X %*% U)^2)
-  canon_corr <- sapply(seq_len(r), function(i) cov(X %*% U[, i], Y %*% V[, i]))
+  canon_corr <- sapply(seq_len(r), function(i) stats::cov(X %*% U[, i], Y %*% V[, i]))
   
   list(U = U, V = V, loss = loss, cor = canon_corr)
 }
@@ -223,8 +223,9 @@ cca_rrr_cv <- function(X, Y,
   n <- nrow(X)
   Sx = matmul(t(X), X) / n
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose = FALSE)) else crossprod(Y) / n
-  
+  print("got here")
   cv_function <- function(lambda) {
+    #print(lambda)
     cca_rrr_cv_folds(X, Y, Sx=Sx, Sy=NULL, kfolds=kfolds, 
                      LW_Sy = LW_Sy,
                      lambda=lambda, r=r, solver=solver, 
@@ -250,18 +251,28 @@ cca_rrr_cv <- function(X, Y,
   
   opt_lambda <- resultsx$lambda[which.min(resultsx$rmse)]
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
+  print("optimal lambda")
   
   final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, lambda=opt_lambda, r=r,
                    highdim=TRUE, solver=solver,
                    standardize=FALSE, LW_Sy=LW_Sy, rho=rho, niter=niter, 
                    thresh=thresh, thresh_0=thresh_0,verbose=verbose)
-  
-  list(U = final$U, 
+  print("res")
+
+  print(list(U = final$U, 
+             V = final$V,
+             lambda = opt_lambda,
+             #resultsx = resultsx,
+             rmse = resultsx$rmse,
+             cor = sapply(1:r, function(i) stats::cov(X %*% final$U[,i], Y %*% final$V[,i]))
+  ))
+  return(list(U = final$U, 
        V = final$V,
        lambda = opt_lambda,
        #resultsx = resultsx,
        rmse = resultsx$rmse,
-       cor = sapply(1:r, function(i) cov(X %*% final$U[,i], Y %*% final$V[,i])))
+       cor = sapply(1:r, function(i) stats::cov(X %*% final$U[,i], Y %*% final$V[,i]))
+       ))
 }
 
 #' Cross-validation Fold Evaluation for CCA_rrr
