@@ -132,9 +132,29 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
       Z = soft_thresh(Z, lambda / rho)
     }
     else{
-      for (g in 1:length(groups)){
-        Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
+      for (g in seq_along(groups)) {
+  
+        # Get the indices for the current group
+        current_indices <- groups[[g]]
+        
+        # 1. Subset Z only ONCE
+        Z_subset <- Z[current_indices]
+        
+        # 2. Calculate the correctly scaled lambda for this group
+        #    Using nrow() is correct for your 2-column coordinate matrix
+        lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
+        
+        # 3. Apply the single, robust thresholding function
+        thresholded_values <- soft_thresh2(Z_subset, lambda_g)
+        
+        # 4. Assign the result back
+        Z[current_indices] <- thresholded_values
       }
+
+
+      # for (g in 1:length(groups)){
+      #   Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
+      # }
     }
     
     # Update H
@@ -258,9 +278,28 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
         Z = soft_thresh(Z, lambda / rho)
       }
       else{
-        for (g in 1:length(groups)){
-          Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
+        for (g in seq_along(groups)) {
+  
+          # Get the indices for the current group
+          current_indices <- groups[[g]]
+          
+          # 1. Subset Z only ONCE
+          Z_subset <- Z[current_indices]
+          
+          # 2. Calculate the correctly scaled lambda for this group
+          #    Using nrow() is correct for your 2-column coordinate matrix
+          lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
+          
+          # 3. Apply the single, robust thresholding function
+          thresholded_values <- soft_thresh2(Z_subset, lambda_g)
+          
+          # 4. Assign the result back
+          Z[current_indices] <- thresholded_values
         }
+
+        # for (g in 1:length(groups)){
+        #   Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
+        # }
       }
       
       # Update H
