@@ -51,8 +51,6 @@ cca_rrr_cv(
 \item{Sx}{Optional X covariance matrix.}
 
 \item{Sy}{Optional Y covariance matrix.}
-
-\item{highdim}{Boolean for high-dimensional regime.}
 }
 \value{
 A list with elements:
