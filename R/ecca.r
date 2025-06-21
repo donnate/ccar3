@@ -19,7 +19,7 @@ fnorm = function(A){
 
 
 soft_thresh_group = function(A, lambda){
-  norm_A = norm(A, type = "F")
+  norm_A <- sqrt(sum(A^2))
   if (norm_A == 0) return(A)
   A * pmax(0, 1 - lambda / norm_A)
 }
@@ -27,11 +27,11 @@ soft_thresh_group = function(A, lambda){
 
 
 soft_thresh2 <- function(A, lambda){
-  norm_A = norm(A, type = "F")^2
+  norm_A <- sqrt(sum(A^2))
   if(norm_A == 0){
     return(A)
   }
-  result = A * pmax(1 - lambda/(sqrt(norm_A)), 0)
+  result = A * pmax(1 - lambda/(norm_A), 0)
   return(result)
 }
 

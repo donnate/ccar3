@@ -236,6 +236,7 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
                              lambdas = 10^seq(-3, 1.5, length.out = 10),
                              kfolds = 5, parallelize = FALSE, standardize = FALSE,
                              LW_Sy = TRUE, solver = "ADMM", rho = 1,
+                             thresh_0 = 1e-6,
                              niter = 1e4, thresh = 1e-4, verbose = FALSE) {
   
   if (nrow(X) < min(ncol(X), ncol(Y))) {
