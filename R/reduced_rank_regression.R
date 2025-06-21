@@ -235,30 +235,22 @@ cca_rrr_cv <- function(X, Y,
   }
   
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
-      # 1. Determine the number of cores to use
-      if (is.null(nb_cores)) {
-        # If user doesn't specify, use all available cores minus one
-        nb_cores <- parallel::detectCores() - 2
-      }
-      cat(paste("\nSetting up parallel backend with", nb_cores, "cores.\n"))
-
-      # 2. Create the correct cluster type based on the Operating System
-      if (.Platform$OS.type == "unix") {
-        # Use FORK for Linux and macOS (including SLURM) - it's faster and more reliable
-        cl <- parallel::makeCluster(nb_cores, type = "FORK")
+    # --- GRACEFUL PARALLEL SETUP ---
+      cl <- setup_parallel_backend(nb_cores)
+      
+      if (!is.null(cl)) {
+        # If the cluster was created successfully, register it and plan to stop it
+        cat(crayon::green("Parallel backend successfully registered.\n"))
+        doParallel::registerDoParallel(cl)
+        on.exit(parallel::stopCluster(cl), add = TRUE)
       } else {
-        # Use PSOCK for Windows
-        cl <- parallel::makeCluster(nb_cores, type = "PSOCK")
-      }
-      
-      # 3. Register the cluster
-      doParallel::registerDoParallel(cl)
-      
-      # 4. Ensure the cluster is always stopped when the function exits
-      #    This is robust and prevents zombie processes.
-      on.exit(parallel::stopCluster(cl), add = TRUE)
+        # If setup_parallel_backend returned NULL, print a warning and proceed serially
+        warning("All parallel setup attempts failed. Proceeding in serial mode.", immediate. = TRUE)
+        parallelize <- FALSE # Ensure %dopar% runs serially
+    }
+   }
 
-
+  if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
     resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
