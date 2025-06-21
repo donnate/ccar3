@@ -237,7 +237,8 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
                              kfolds = 5, parallelize = FALSE, standardize = FALSE,
                              LW_Sy = TRUE, solver = "ADMM", rho = 1,
                              thresh_0 = 1e-6,
-                             niter = 1e4, thresh = 1e-4, verbose = FALSE) {
+                             niter = 1e4, thresh = 1e-4, verbose = FALSE,
+                             nb_cores = NULL) {
   
   if (nrow(X) < min(ncol(X), ncol(Y))) {
     warning("Both X and Y are high-dimensional; method may be unstable.")
@@ -257,12 +258,36 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
     data.frame(lambda = lambda, rmse = rmse)
   }
   
-  results <- if (parallelize) {
-    no_cores <- parallel::detectCores() - 5
-    doParallel::registerDoParallel(cores = no_cores)
-    foreach(lambda = lambdas, .combine = rbind, .packages = c("CVXR", "Matrix")) %dopar% run_cv(lambda)
+  if (parallelize) {
+
+
+        # 1. Determine the number of cores to use
+    if (is.null(nb_cores)) {
+      # If user doesn't specify, use all available cores minus one
+      nb_cores <- parallel::detectCores() - 2
+    }
+    cat(paste("\nSetting up parallel backend with", nb_cores, "cores.\n"))
+
+    # 2. Create the correct cluster type based on the Operating System
+    if (.Platform$OS.type == "unix") {
+      # Use FORK for Linux and macOS (including SLURM) - it's faster and more reliable
+      cl <- parallel::makeCluster(nb_cores, type = "FORK")
+    } else {
+      # Use PSOCK for Windows
+      cl <- parallel::makeCluster(nb_cores, type = "PSOCK")
+    }
+    
+    # 3. Register the cluster
+    doParallel::registerDoParallel(cl)
+    
+    # 4. Ensure the cluster is always stopped when the function exits
+    #    This is robust and prevents zombie processes.
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+
+
+    results <- foreach(lambda = lambdas, .combine = rbind, .packages = c("CVXR", "Matrix")) %dopar% run_cv(lambda)
   } else {
-    purrr::map_dfr(lambdas, run_cv)
+    results <- purrr::map_dfr(lambdas, run_cv)
   }
   
   results$rmse[is.na(results$rmse) | results$rmse == 0] <- 1e8
