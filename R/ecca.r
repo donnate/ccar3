@@ -352,7 +352,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                      standardize = T, Sx = NULL, Sy = NULL, Sxy = NULL,
                      rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
                      maxiter = 500, verbose = T, parallel = T,
-                     type_socket = "PSOCK"){
+                     nb_cores = NULL){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -391,7 +391,29 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
     
     ## Cross validation
     if(parallel){
-      doParallel::registerDoParallel(parallel::makeCluster(parallel::detectCores() - 2, type = type_socket))
+        # 1. Determine the number of cores to use
+        if (is.null(nb_cores)) {
+          # If user doesn't specify, use all available cores minus one
+          nb_cores <- parallel::detectCores() - 1
+        }
+        cat(paste("\nSetting up parallel backend with", nb_cores, "cores.\n"))
+
+        # 2. Create the correct cluster type based on the Operating System
+        if (.Platform$OS.type == "unix") {
+          # Use FORK for Linux and macOS (including SLURM) - it's faster and more reliable
+          cl <- parallel::makeCluster(nb_cores, type = "FORK")
+        } else {
+          # Use PSOCK for Windows
+          cl <- parallel::makeCluster(nb_cores, type = "PSOCK")
+        }
+
+
+      # 3. Register the cluster
+      doParallel::registerDoParallel(cl)
+      
+      # 4. Ensure the cluster is always stopped when the function exits
+      #    This is robust and prevents zombie processes.
+      on.exit(parallel::stopCluster(cl), add = TRUE)
       ## Parallel cross validation
       cv = foreach(fold = folds, 
                    .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), 
@@ -443,9 +465,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                      }
                      return(scores)
                    }
-      # Stop the cluster when done
       
-      doParallel::stopImplicitCluster()
       
       # --- Post-processing to handle potential errors ---
       # Identify which folds resulted in an error
@@ -568,7 +588,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
 ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
                    rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
                    verbose = F, parallel = F,
-                   type_socket = "PSOCK"){
+                   nb_cores = NULL){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -583,7 +603,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
     eval = ecca.eval(X, Y, lambdas=lambdas, groups=groups, r=r, rho=rho,
                      standardize = F,
                      B0 = B0, nfold=nfold, eps=eps,  maxiter=maxiter, verbose=verbose, parallel= parallel,
-                     type_socket = type_socket)
+                     nb_cores = nb_cores)
     if(select == "lambda.1se") lambda.opt = eval$lambda.1se
     else lambda.opt = eval$lambda.min
   } else {

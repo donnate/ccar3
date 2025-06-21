@@ -216,7 +216,8 @@ cca_rrr_cv <- function(X, Y,
                        rho=1,
                        thresh_0=1e-6,
                        niter=1e4,
-                       thresh = 1e-4, verbose=FALSE) {
+                       thresh = 1e-4, verbose=FALSE,
+                       nb_cores = NULL) {
   
   X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else Y #scale(Y, scale = FALSE)
@@ -234,8 +235,30 @@ cca_rrr_cv <- function(X, Y,
   }
   
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
-    no_cores <- parallel::detectCores() - 2
-    doParallel::registerDoParallel(cores=no_cores)
+      # 1. Determine the number of cores to use
+      if (is.null(nb_cores)) {
+        # If user doesn't specify, use all available cores minus one
+        nb_cores <- parallel::detectCores() - 2
+      }
+      cat(paste("\nSetting up parallel backend with", nb_cores, "cores.\n"))
+
+      # 2. Create the correct cluster type based on the Operating System
+      if (.Platform$OS.type == "unix") {
+        # Use FORK for Linux and macOS (including SLURM) - it's faster and more reliable
+        cl <- parallel::makeCluster(nb_cores, type = "FORK")
+      } else {
+        # Use PSOCK for Windows
+        cl <- parallel::makeCluster(nb_cores, type = "PSOCK")
+      }
+      
+      # 3. Register the cluster
+      doParallel::registerDoParallel(cl)
+      
+      # 4. Ensure the cluster is always stopped when the function exits
+      #    This is robust and prevents zombie processes.
+      on.exit(parallel::stopCluster(cl), add = TRUE)
+
+
     resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
