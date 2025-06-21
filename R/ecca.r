@@ -351,7 +351,8 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
 ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2, 
                      standardize = T, Sx = NULL, Sy = NULL, Sxy = NULL,
                      rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
-                     maxiter = 500, verbose = T, parallel = T){
+                     maxiter = 500, verbose = T, parallel = T,
+                     type_socket = "PSOCK"){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -390,7 +391,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
     
     ## Cross validation
     if(parallel){
-      doParallel::registerDoParallel(parallel::makeCluster(parallel::detectCores() - 2, type = "PSOCK"))
+      doParallel::registerDoParallel(parallel::makeCluster(parallel::detectCores() - 2, type = type_socket))
       ## Parallel cross validation
       cv = foreach(fold = folds, 
                    .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), 
@@ -566,7 +567,8 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
 #' @export
 ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
                    rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
-                   verbose = F, parallel = F){
+                   verbose = F, parallel = F,
+                   type_socket = "PSOCK"){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -580,7 +582,8 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
   if(length(lambdas) > 1){
     eval = ecca.eval(X, Y, lambdas=lambdas, groups=groups, r=r, rho=rho,
                      standardize = F,
-                     B0 = B0, nfold=nfold, eps=eps,  maxiter=maxiter, verbose=verbose, parallel= parallel)
+                     B0 = B0, nfold=nfold, eps=eps,  maxiter=maxiter, verbose=verbose, parallel= parallel,
+                     type_socket = type_socket)
     if(select == "lambda.1se") lambda.opt = eval$lambda.1se
     else lambda.opt = eval$lambda.min
   } else {
