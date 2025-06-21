@@ -7,6 +7,8 @@ library(SMUT)
 library(crayon)
 library(matrixStats)
 
+
+
 soft_thresh = function(A, lambda){
   #A * pmax(1 - lambda / abs(A), 0)
   sign(A) * pmax(abs(A) - lambda, 0)
@@ -389,31 +391,24 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
     ## Choose penalty lambda
     results <- data.frame(lambda = numeric(), mse = numeric(), se = numeric())
     
-    ## Cross validation
-    if(parallel){
-        # 1. Determine the number of cores to use
-        if (is.null(nb_cores)) {
-          # If user doesn't specify, use all available cores minus one
-          nb_cores <- parallel::detectCores() - 1
-        }
-        cat(paste("\nSetting up parallel backend with", nb_cores, "cores.\n"))
-
-        # 2. Create the correct cluster type based on the Operating System
-        if (.Platform$OS.type == "unix") {
-          # Use FORK for Linux and macOS (including SLURM) - it's faster and more reliable
-          cl <- parallel::makeCluster(nb_cores, type = "FORK")
-        } else {
-          # Use PSOCK for Windows
-          cl <- parallel::makeCluster(nb_cores, type = "PSOCK")
-        }
-
-
-      # 3. Register the cluster
-      doParallel::registerDoParallel(cl)
+    if (parallel) {
+    # --- GRACEFUL PARALLEL SETUP ---
+      cl <- setup_parallel_backend(nb_cores)
       
-      # 4. Ensure the cluster is always stopped when the function exits
-      #    This is robust and prevents zombie processes.
-      on.exit(parallel::stopCluster(cl), add = TRUE)
+      if (!is.null(cl)) {
+        # If the cluster was created successfully, register it and plan to stop it
+        cat(crayon::green("Parallel backend successfully registered.\n"))
+        doParallel::registerDoParallel(cl)
+        on.exit(parallel::stopCluster(cl), add = TRUE)
+      } else {
+        # If setup_parallel_backend returned NULL, print a warning and proceed serially
+        warning("All parallel setup attempts failed. Proceeding in serial mode.", immediate. = TRUE)
+        parallel <- FALSE # Ensure %dopar% runs serially
+    }
+   }
+
+   if (parallel) {
+  
       ## Parallel cross validation
       cv = foreach(fold = folds, 
                    .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), 
