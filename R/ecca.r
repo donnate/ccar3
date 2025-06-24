@@ -354,7 +354,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                      standardize = T, Sx = NULL, Sy = NULL, Sxy = NULL,
                      rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
                      maxiter = 500, verbose = T, parallel = T,
-                     nb_cores = NULL){
+                     nb_cores = NULL, set_seed_cv=NULL){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -376,6 +376,15 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
           Sy = matmul(t(Y), Y) / n
         }
     
+    
+    
+    
+    ## Create folds
+    if (is.null(set_seed_cv) == FALSE){
+       set.seed(set_seed_cv)
+    }
+   
+
     
     folds = caret::createFolds(1:n, k = nfold, list = T)
     n_success = nfold
@@ -555,12 +564,14 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
 #' @param r Target rank
 #' @param nfold Number of cross-validation folds
 #' @param select Which lambda to select: "lambda.min" or "lambda.1se"
-#' @param do.scale Whether to scale variables
+#' @param standardize Whether to scale variables
 #' @param B0 Initial value for the coefficient matrix (optional)
 #' @param eps Convergence threshold for ADMM
 #' @param rho ADMM parameter
 #' @param maxiter Maximum number of ADMM iterations
 #' @param verbose Print diagnostics
+#' @param nb_cores Number of cores to use for parallel processing (default is NULL, which uses all available cores)
+#' @param set_seed_cv Optional seed for reproducibility of cross-validation folds (default is NULL)
 #' @param parallel Whether to run cross-validation in parallel
 #'
 #' @return A list with elements:
@@ -574,7 +585,8 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
 ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
                    rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
                    verbose = F, parallel = F,
-                   nb_cores = NULL){
+                   nb_cores = NULL,
+                   set_seed_cv=NULL){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -589,7 +601,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
     eval = ecca.eval(X, Y, lambdas=lambdas, groups=groups, r=r, rho=rho,
                      standardize = F,
                      B0 = B0, nfold=nfold, eps=eps,  maxiter=maxiter, verbose=verbose, parallel= parallel,
-                     nb_cores = nb_cores)
+                     nb_cores = nb_cores, set_seed_cv=set_seed_cv)
     if(select == "lambda.1se") lambda.opt = eval$lambda.1se
     else lambda.opt = eval$lambda.min
   } else {
