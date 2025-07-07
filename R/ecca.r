@@ -201,7 +201,7 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   } else{
     U = matrix(NA, p, r)
     V = matrix(NA, q, r)
-    return(list(U = U, V = V, loss = mean(apply((matmul(X, U) - matmul(Y,V))^2,2,sum)), cor = rep(0, r)))
+    return(list(U = U, V = V, loss = Inf, cor = rep(0, r)))
   }
   
   
@@ -354,7 +354,8 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                      standardize = T, Sx = NULL, Sy = NULL, Sxy = NULL,
                      rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
                      maxiter = 500, verbose = T, parallel = T,
-                     nb_cores = NULL, set_seed_cv=NULL){
+                     nb_cores = NULL, set_seed_cv=NULL, scoring_method = "mse",
+                     cv_use_median = FALSE){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -451,11 +452,20 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                        Y_val_mat <- Y[fold, , drop = FALSE]
                        
                        #if(is.na(U)) scores[i] = NA
-                       if(!is.null(U) && !any(is.na(U))) {
-                         scores[i] = mean((matmul(X_val_mat, U) - Y_val_mat %*%V)^2)
-                       } else {
-                         scores[i] = Inf
-                       }
+                     
+                      if (!is.null(U) && !any(is.na(U))) {
+                              if (scoring_method == "mse") {
+                                  scores[i] = mean((matmul(X_val_mat, U) - Y_val_mat %*% V)^2)
+                              } else if (scoring_method == "trace") {
+                                  scores[i] = -sum(diag(t(U) %*% t(X_val_mat) %*% Y_val_mat %*% V))
+                              } else {
+                                  stop("Unknown scoring method. Use 'mse' or 'trace'.")
+                              }
+                      } else {
+                              scores[i] = Inf
+                      }
+                         
+                   
             
                      }
                      return(scores)
@@ -483,62 +493,105 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
       scores.cv = do.call(cbind, successful_results)
       n_success <- length(successful_results)
     } else {
-      scores.cv = c()
+      ## Store successful results in a list
+      cv_results_list <- list()
+
       for(i in 1:length(folds)){
-        
         if(verbose) print(paste0("\n\nfold:", i))
-        fold = folds[[i]]
         
-        n_full <- nrow(X)
-        X_train <- X[-fold, ]
-        Y_train <- Y[-fold, ]
-        X_val <- X[fold, ]
-        Y_val <- Y[fold, ]
-        
-        # We don't even need to create X_train and Y_train explicitly for the covariance calculation
-        n_train <- n_full - nrow(X_val)
-        
-        # --- DOWNDATE TRICK ---
-        Sx_train <- (n_full * Sx - crossprod(X_val)) / n_train
-        Sy_train <- (n_full * Sy - crossprod(Y_val)) / n_train
-        Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
-        
-        
-        ## Fit lasso model
-        ECCA = ecca_across_lambdas(X[-fold,,drop = F], Y[-fold,,drop = F], 
-                                   Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
-                                   standardize = F,
-                                   lambdas = lambdas, groups = groups, r = r, 
-                                   rho = rho, B0 = B0, eps= eps, maxiter = maxiter, verbose = verbose)
-        
-        ## Evaluate on test set
-        scores = rep(0, length(lambdas))
-        for(i in 1:length(lambdas)){
-          if(length(lambdas) > 1){
-            U = (ECCA$U)[[i]]
-            V = (ECCA$V)[[i]]
-          } else {
-            U = ECCA$U
-            V = ECCA$V
-          }
-          #if(is.na(U)) scores[i] = NA
-          #if(is.na(U)) scores[i] = NA
-          X_val_mat <- X[fold, , drop = FALSE]
-          Y_val_mat <- Y[fold, , drop = FALSE]
+        # Wrap the fold computation in tryCatch to handle potential errors
+        result <- tryCatch({
+          fold = folds[[i]]
           
-          if(!is.null(U) && !any(is.na(U))) {
-            scores[i] = mean((matmul(X_val_mat, U) - Y_val_mat %*%V)^2)
-          } else {
-            scores[i] = Inf
-          }
+          n_full <- nrow(X)
+          X_val <- X[fold, ]
           
-        }
-        if(verbose) print(paste("\n\nMSEs:", scores))
-        scores.cv = cbind(scores.cv, scores)
+          n_train <- n_full - nrow(X_val)
+          
+          # --- DOWNDATE TRICK ---
+          Sx_train <- (n_full * Sx - crossprod(X_val)) / n_train
+          Sy_train <- (n_full * Sy - crossprod(Y_val)) / n_train
+          Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
+          
+          ## Fit lasso model
+          ECCA = ecca_across_lambdas(X[-fold,,drop = F], Y[-fold,,drop = F], 
+                                     Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
+                                     standardize = F,
+                                     lambdas = lambdas, groups = groups, r = r, 
+                                     rho = rho, B0 = B0, eps= eps, maxiter = maxiter, verbose = verbose)
+          
+          ## Evaluate on test set
+          scores = rep(0, length(lambdas))
+          # Use 'j' for the inner loop to avoid conflict with 'i'
+          for(j in 1:length(lambdas)){
+            if(length(lambdas) > 1){
+              U = (ECCA$U)[[j]]
+              V = (ECCA$V)[[j]]
+            } else {
+              U = ECCA$U
+              V = ECCA$V
+            }
+            
+            X_val_mat <- X[fold, , drop = FALSE]
+            Y_val_mat <- Y[fold, , drop = FALSE]
+            
+            if (!is.null(U) && !any(is.na(U))) {
+                  if (scoring_method == "mse") {
+                      scores[j] = mean((matmul(X_val_mat, U) - Y_val_mat %*% V)^2)
+                  } else if (scoring_method == "trace") {
+                      scores[j] = -sum(diag(t(U) %*% t(X_val_mat) %*% Y_val_mat %*% V))
+                  } else {
+                      stop("Unknown scoring method. Use 'mse' or 'trace'.")
+                  }
+            } else {
+                  scores[j] = Inf
+            }
+            
+          
+          if(verbose) print(paste("\n\nMSEs:", scores))
+          
+          # Return the scores vector on success
+          scores 
+          
+        }, error = function(e) {
+          # If an error occurs, return the error object
+          warning(paste("Fold", i, "failed with error:", e$message))
+          return(e)
+        })
+        
+        # Append the result (scores or error) to the list
+        cv_results_list[[i]] <- result
       }
+    
+      
+      # --- Post-processing to handle potential errors (same as in parallel block) ---
+      is_error <- sapply(cv_results_list, function(x) inherits(x, "error"))
+      
+      if(any(is_error)){
+        warning(paste(sum(is_error), "out of", length(folds), "folds failed during cross-validation."))
+      }
+      
+      # Filter out the errors
+      successful_results <- cv_results_list[!is_error]
+      
+      # Stop if all folds failed
+      if(length(successful_results) == 0) {
+        stop("All CV folds failed. Cannot select a lambda.")
+      }
+      
+      # Combine successful results and set n_success
+      scores.cv = do.call(cbind, successful_results)
+      n_success <- length(successful_results)
     }
-    scores = data.frame(lambda = lambdas, mse = rowMeans(scores.cv), 
-                        se = matrixStats::rowSds(scores.cv)/sqrt(n_success))
+
+
+   if (cv_use_median == FALSE) {
+      scores = data.frame(lambda = lambdas, mse = rowMeans(scores.cv), 
+                          se = matrixStats::rowSds(scores.cv)/sqrt(n_success))
+   }else {
+      scores = data.frame(lambda = lambdas, mse =apply(scores.cv, 1, median), 
+                          se = matrixStats::rowSds(scores.cv)/sqrt(n_success))
+   }
     # plt = scores %>%
     #   ggplot(aes(lambda, mse))+
     #   geom_point()+
@@ -571,8 +624,10 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
 #' @param maxiter Maximum number of ADMM iterations
 #' @param verbose Print diagnostics
 #' @param nb_cores Number of cores to use for parallel processing (default is NULL, which uses all available cores)
-#' @param set_seed_cv Optional seed for reproducibility of cross-validation folds (default is NULL)
+#' @param set_seed_cv Optional seed for reproducibility of cross-validation folds (de)
 #' @param parallel Whether to run cross-validation in parallel
+#' @param scoring_method Method to score the model during cross-validation, either "mse" (mean squared error) or "trace" (trace of the product of matrices)
+#' @param cv_use_median Whether to use the median of the cross-validation scores instead of the mean. Default is FALSE.
 #'
 #' @return A list with elements:
 #' \describe{
@@ -586,7 +641,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
                    rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
                    verbose = F, parallel = F,
                    nb_cores = NULL,
-                   set_seed_cv=NULL){
+                   set_seed_cv=NULL, scoring_method = "mse", cv_use_median = FALSE){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -601,7 +656,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
     eval = ecca.eval(X, Y, lambdas=lambdas, groups=groups, r=r, rho=rho,
                      standardize = F,
                      B0 = B0, nfold=nfold, eps=eps,  maxiter=maxiter, verbose=verbose, parallel= parallel,
-                     nb_cores = nb_cores, set_seed_cv=set_seed_cv)
+                     nb_cores = nb_cores, set_seed_cv=set_seed_cv, scoring_method = scoring_method, cv_use_median = cv_use_median)
     if(select == "lambda.1se") lambda.opt = eval$lambda.1se
     else lambda.opt = eval$lambda.min
   } else {
@@ -613,10 +668,19 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
   ECCA = ecca(X, Y, lambda=lambda.opt, groups = groups, r=r, rho=rho, B0=B0, eps=eps, 
               standardize = FALSE,
               maxiter = maxiter, verbose = verbose)
+
+  if (any(is.na(ECCA$U)) || any(is.na(ECCA$V))) {
+    fit_cor <- rep(NA, r)
+    fit_loss <- Inf
+  } else {
+    fit_cor <- diag(matmul(matmul(t(ECCA$U), matmul(t(X), Y)), ECCA$V))
+    fit_loss <- mean(apply((matmul(X , ECCA$U) - matmul(Y , ECCA$V))^2, 2, sum))
+  }
   
-  return(list(U = ECCA$U, V = ECCA$V, 
-              cor = diag(matmul(matmul(t(ECCA$U), matmul(t(X), Y)), ECCA$V)), 
-              loss = mean(apply((matmul(X , ECCA$U) - matmul(Y , ECCA$V))^2,2,sum)),
+  return(list(U = ECCA$U, 
+              V = ECCA$V, 
+              cor = fit_cor, 
+              loss = fit_loss,
               lambda.opt  = lambda.opt,
               cv.scores = eval$scores))
 }
