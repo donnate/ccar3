@@ -546,7 +546,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
             } else {
                   scores[j] = Inf
             }
-            
+          }  
           
           if(verbose) print(paste("\n\nMSEs:", scores))
           
