@@ -197,7 +197,9 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   if(max(L0) > 1e-8){
     U = matmul(matmul(matmul(B, Sy12),V0), diag(inv_L0, nrow = length(L0)))
     V = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
-    return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = diag(matmul(t(U), matmul(Sxy, V)))))
+    #return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = diag(matmul(t(U), matmul(Sxy, V)))))
+    return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = L0))
+
   } else{
     U = matrix(NA, p, r)
     V = matrix(NA, q, r)
