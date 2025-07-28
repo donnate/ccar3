@@ -505,7 +505,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
           
           n_full <- nrow(X)
           X_val <- X[fold, ]
-          
+          Y_val <- Y[fold, ]   # This line was missing
           n_train <- n_full - nrow(X_val)
           
           # --- DOWNDATE TRICK ---
