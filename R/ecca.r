@@ -505,7 +505,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
           
           n_full <- nrow(X)
           X_val <- X[fold, ]
-          
+          Y_val <- Y[fold, ]
           n_train <- n_full - nrow(X_val)
           
           # --- DOWNDATE TRICK ---
@@ -673,7 +673,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
     fit_cor <- rep(NA, r)
     fit_loss <- Inf
   } else {
-    fit_cor <- diag(matmul(matmul(t(ECCA$U), matmul(t(X), Y)), ECCA$V))
+    fit_cor <- diag(matmul(matmul(t(ECCA$U), matmul(t(X), Y)), ECCA$V))/nrow(X)
     fit_loss <- mean(apply((matmul(X , ECCA$U) - matmul(Y , ECCA$V))^2, 2, sum))
   }
   
