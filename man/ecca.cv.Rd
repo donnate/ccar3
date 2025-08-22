@@ -18,7 +18,11 @@ ecca.cv(
   eps = 1e-04,
   maxiter = 500,
   verbose = F,
-  parallel = F
+  parallel = F,
+  nb_cores = NULL,
+  set_seed_cv = NULL,
+  scoring_method = "mse",
+  cv_use_median = FALSE
 )
 }
 \arguments{
@@ -31,6 +35,8 @@ ecca.cv(
 \item{groups}{List of index vectors defining groups of predictors}
 
 \item{r}{Target rank}
+
+\item{standardize}{Whether to scale variables}
 
 \item{rho}{ADMM parameter}
 
@@ -48,7 +54,13 @@ ecca.cv(
 
 \item{parallel}{Whether to run cross-validation in parallel}
 
-\item{do.scale}{Whether to scale variables}
+\item{nb_cores}{Number of cores to use for parallel processing (default is NULL, which uses all available cores)}
+
+\item{set_seed_cv}{Optional seed for reproducibility of cross-validation folds (de)}
+
+\item{scoring_method}{Method to score the model during cross-validation, either "mse" (mean squared error) or "trace" (trace of the product of matrices)}
+
+\item{cv_use_median}{Whether to use the median of the cross-validation scores instead of the mean. Default is FALSE.}
 }
 \value{
 A list with elements:

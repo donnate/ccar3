@@ -58,6 +58,7 @@ test_that("cca_group returns the correct answer", {
 
 
 test_that("cca_group computes the same solutions across solvers", {
+  skip_if_not_installed("CVXR")
   set.seed(123)
   r = 2
   gen = generate_example_group(n=500, p1=100, p2=5, 

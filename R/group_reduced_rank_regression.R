@@ -57,6 +57,12 @@ solve_group_rrr_admm <- function(X, tilde_Y, Sx, groups, lambda, rho=1, niter=1e
 
 # Helper: CVXR-based group sparse solver
 solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
+
+  if (!requireNamespace("CVXR", quietly = TRUE)) {
+    stop("Package 'CVXR' must be installed to use the CVX solver.",
+         call. = FALSE)
+  }
+
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
   B <- CVXR::Variable(p, q)
@@ -67,10 +73,10 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
   penalty <- Reduce(`+`, penalty_exprs)  # or do.call("+", penalty_exprs)
   
   objective <- CVXR::Minimize(
-    1/n *  sum_squares(tilde_Y - X %*% B) + lambda * penalty
+    1/n *  CVXR::sum_squares(tilde_Y - X %*% B) + lambda * penalty
   )
   
-  prob <- Problem(objective)
+  prob <- CVXR::Problem(objective)
   res <- CVXR::solve(prob)
   
   B_opt <- res$getValue(B)
@@ -89,6 +95,7 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
 #' @param groups List of index vectors defining groups of predictors
 #' @param Sx Optional covariance matrix for X; if NULL computed internally
 #' @param Sy Optional covariance matrix for Y; if NULL computed internally
+#' @param Sxy Optional cross covariance matrix for X and Y; if NULL computed internally
 #' @param lambda Regularization parameter
 #' @param r Target rank
 #' @param standardize Whether to scale variables
@@ -97,6 +104,7 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
 #' @param rho ADMM parameter
 #' @param niter Maximum number of ADMM iterations
 #' @param thresh Convergence threshold for ADMM
+#' @param thresh_0 tolerance for declaring entries non-zero
 #' @param verbose Print diagnostics
 #'
 #' @return A list with elements:
@@ -209,11 +217,10 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 #' @param X Predictor matrix (n x p)
 #' @param Y Response matrix (n x q)
 #' @param groups List of index vectors defining groups of predictors
-#' @param Sx Optional covariance matrix for X; if NULL computed internally
-#' @param Sy Optional covariance matrix for Y; if NULL computed internally
 #' @param lambdas Grid of regularization parameters to try out
 #' @param r Target rank
 #' @param kfolds Nb of folds for the CV procedure
+#' @param parallelize Whether to use parallel processing (default is FALSE)
 #' @param standardize Whether to scale variables
 #' @param LW_Sy Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)
 #' @param solver Either "ADMM" or "CVXR"
@@ -221,6 +228,8 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 #' @param niter Maximum number of ADMM iterations
 #' @param thresh Convergence threshold for ADMM
 #' @param verbose Print diagnostics
+#' @param thresh_0 tolerance for declaring entries non-zero
+#' @param nb_cores Number of cores to use for parallelization (default is all available cores minus 1)
 #'
 #' @return A list with elements:
 #' \describe{
@@ -259,6 +268,10 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
   }
   
     if (parallelize) {
+      if (!requireNamespace("doParallel", quietly = TRUE)) {
+         stop("Package 'doParallel' must be installed to use the parallelization option.",
+         call. = FALSE)
+      }
     # --- GRACEFUL PARALLEL SETUP ---
       cl <- setup_parallel_backend(nb_cores)
       
@@ -283,7 +296,7 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
   }
   
   results$rmse[is.na(results$rmse) | results$rmse == 0] <- 1e8
-  results <- results %>% filter(rmse > 1e-5)
+  results <- results %>% dplyr::filter(rmse > 1e-5)
   
   opt_lambda <- results$lambda[which.min(results$rmse)]
   if (is.na(opt_lambda)) opt_lambda <- 0.1

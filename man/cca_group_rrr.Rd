@@ -14,11 +14,12 @@ cca_group_rrr(
   lambda = 0,
   r,
   standardize = FALSE,
-  LW_Sy = FALSE,
+  LW_Sy = TRUE,
   solver = "ADMM",
   rho = 1,
   niter = 10000,
   thresh = 1e-04,
+  thresh_0 = 1e-06,
   verbose = FALSE
 )
 }
@@ -33,13 +34,15 @@ cca_group_rrr(
 
 \item{Sy}{Optional covariance matrix for Y; if NULL computed internally}
 
+\item{Sxy}{Optional cross covariance matrix for X and Y; if NULL computed internally}
+
 \item{lambda}{Regularization parameter}
 
 \item{r}{Target rank}
 
 \item{standardize}{Whether to scale variables}
 
-\item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
+\item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)}
 
 \item{solver}{Either "ADMM" or "CVXR"}
 
@@ -48,6 +51,8 @@ cca_group_rrr(
 \item{niter}{Maximum number of ADMM iterations}
 
 \item{thresh}{Convergence threshold for ADMM}
+
+\item{thresh_0}{tolerance for declaring entries non-zero}
 
 \item{verbose}{Print diagnostics}
 }

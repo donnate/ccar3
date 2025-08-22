@@ -12,12 +12,14 @@ cca_rrr_cv(
   kfolds = 14,
   solver = "ADMM",
   parallelize = FALSE,
-  LW_Sy = FALSE,
+  LW_Sy = TRUE,
   standardize = TRUE,
   rho = 1,
+  thresh_0 = 1e-06,
   niter = 10000,
   thresh = 1e-04,
-  verbose = FALSE
+  verbose = FALSE,
+  nb_cores = NULL
 )
 }
 \arguments{
@@ -41,17 +43,15 @@ cca_rrr_cv(
 
 \item{rho}{ADMM parameter.}
 
+\item{thresh_0}{tolerance for declaring entries non-zero}
+
 \item{niter}{Maximum number of iterations for ADMM.}
 
 \item{thresh}{Convergence threshold.}
 
 \item{verbose}{Logical for verbose output.}
 
-\item{Sx}{Optional X covariance matrix.}
-
-\item{Sy}{Optional Y covariance matrix.}
-
-\item{highdim}{Boolean for high-dimensional regime.}
+\item{nb_cores}{Number of cores to use for parallelization (default is all available cores minus 1)}
 }
 \value{
 A list with elements:

@@ -7,9 +7,9 @@
 subdistance(A, B)
 }
 \arguments{
-\item{a}{A matrix whose columns span a subspace.}
+\item{A}{A matrix whose columns span a subspace.}
 
-\item{b}{A matrix whose columns span a subspace.}
+\item{B}{A matrix whose columns span a subspace.}
 }
 \description{
 Calculate subdistance between subspace spanned by the columns of a and the subspace spanned by the columns of b

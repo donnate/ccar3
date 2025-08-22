@@ -6,7 +6,8 @@ library(PMA)
 #' @param n.cv Number of cross-validation folds (default is 5)
 #' @param lambdax Vector of sparsity parameters for X (default is a sequence from 0 to 1 with step 0.1)
 #' @param lambday Vector of sparsity parameters for Y (default is a sequence from 0 to 1 with step 0.1)
-#' 
+#' @param standardize Standardize (center and scale) the data matrices X and Y (default is TRUE) before analysis
+#' @param rank Number of canonical components to extract
 #'
 #' @return the appropriate levels of regularisation
 #' @export

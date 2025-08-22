@@ -18,6 +18,7 @@ library(CCA)
 #' @param B.initial Initial value for the canonical vector B (default is NULL, which uses a canonical ridge solution)
 #' @param max.iter Maximum number of iterations for convergence (default is 20)
 #' @param conv Convergence threshold (default is 1e-2)
+#' @param standardize Standardize (center and scale) the data matrices X and Y (default is TRUE) before analysis
 #' @return A list with elements:
 #' \describe{
 #'   \item{U}{Canonical direction matrix for X (p x r)}

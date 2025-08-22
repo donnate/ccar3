@@ -63,7 +63,7 @@ test_that("ecca.cv returns the correct answer", {
 
 
 test_that("ecca.cv parallelization works", {
-  
+  skip_if_not_installed("doParallel")
   ##### Generate toy example data
   set.seed(123)
   r = 2

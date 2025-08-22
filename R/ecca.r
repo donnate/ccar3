@@ -7,6 +7,8 @@ library(SMUT)
 library(crayon)
 library(matrixStats)
 
+#' @importFrom magrittr %>%
+#' @importFrom tidyr replace_na
 
 
 soft_thresh = function(A, lambda){
@@ -53,6 +55,9 @@ rmat = function(n, p){
 #' @param X Predictor matrix (n x p)
 #' @param Y Response matrix (n x q)
 #' @param groups List of index vectors defining groups of predictors
+#' @param Sx precomputed covariance matrix for X (optional)
+#' @param Sy precomputed covariance matrix for Y (optional)
+#' @param Sxy precomputed covariance matrix between X and Y (optional)
 #' @param lambda Regularization parameter
 #' @param r Target rank
 #' @param standardize Whether to scale variables
@@ -393,6 +398,10 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
     results <- data.frame(lambda = numeric(), mse = numeric(), se = numeric())
     
     if (parallel) {
+      if (!requireNamespace("doParallel", quietly = TRUE)) {
+         stop("Package 'doParallel' must be installed to use the parallelization option.",
+         call. = FALSE)
+      }
     # --- GRACEFUL PARALLEL SETUP ---
       cl <- setup_parallel_backend(nb_cores)
       
@@ -539,7 +548,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                   if (scoring_method == "mse") {
                       scores[j] = mean((matmul(X_val_mat, U) - Y_val_mat %*% V)^2)
                   } else if (scoring_method == "trace") {
-                      scores[j] = -sum(diag(t(U) %*% t(X_val_mat) %*% Y_val_mat %*% V))
+                      scores[j] = -sum(diag(t(U) %*% t(X_val_mat) %*% Y_val_mat %*% V)/nrow(X_val_mat))
                   } else {
                       stop("Unknown scoring method. Use 'mse' or 'trace'.")
                   }
@@ -593,16 +602,10 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
       scores = data.frame(lambda = lambdas, mse =apply(scores.cv, 1, median), 
                           se = matrixStats::rowSds(scores.cv)/sqrt(n_success))
    }
-    # plt = scores %>%
-    #   ggplot(aes(lambda, mse))+
-    #   geom_point()+
-    #   geom_line()+
-    #   geom_errorbar(aes(ymin = mse - se, ymax = mse + se))+
-    #   theme_bw()
-    # suppressWarnings(print(plt))
-    lambda.min = scores %>% slice(which.min(mse)) %>% pull(lambda)
-    upper = scores %>% slice(which.min(mse)) %>% mutate(upper = mse + se) %>% pull(upper)
-    lambda.1se = scores %>% filter(mse <= upper) %>% pull(lambda) %>% max()
+
+    lambda.min = scores %>% dplyr::slice(which.min(mse)) %>% dplyr::pull(lambda)
+    upper = scores %>% dplyr::slice(which.min(mse)) %>% dplyr::mutate(upper = mse + se) %>% dplyr::pull(upper)
+    lambda.1se = scores %>% dplyr::filter(mse <= upper) %>% dplyr::pull(lambda) %>% max()
   }
   return(list(scores = scores, lambda.min = lambda.min, lambda.1se = lambda.1se))
 }
@@ -675,7 +678,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
     fit_loss <- Inf
   } else {
     fit_cor <- diag(matmul(matmul(t(ECCA$U), matmul(t(X), Y)), ECCA$V))/nrow(X)
-    fit_loss <- mean(apply((matmul(X , ECCA$U) - matmul(Y , ECCA$V))^2, 2, sum))
+    fit_loss <- mean(apply((matmul(X , ECCA$U) - matmul(Y , ECCA$V))^2/nrow(X), 2, sum))
   }
   
   return(list(U = ECCA$U, 

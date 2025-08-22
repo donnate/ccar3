@@ -13,11 +13,12 @@ cca_rrr(
   r,
   highdim = TRUE,
   solver = "ADMM",
-  LW_Sy = FALSE,
+  LW_Sy = TRUE,
   standardize = TRUE,
   rho = 1,
   niter = 10000,
   thresh = 1e-04,
+  thresh_0 = 1e-06,
   verbose = FALSE
 )
 }
@@ -47,6 +48,8 @@ cca_rrr(
 \item{niter}{Maximum number of iterations for ADMM.}
 
 \item{thresh}{Convergence threshold.}
+
+\item{thresh_0}{For the ADMM solver: Set entries whose absolute value is below this to 0 (default 1e-6).}
 
 \item{verbose}{Logical for verbose output.}
 }

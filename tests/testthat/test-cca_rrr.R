@@ -45,6 +45,8 @@ test_that("cca_rrr returns the correct answer", {
 
 test_that("cca_rrr computes the same solutions across solvers", {
   set.seed(123)
+  skip_if_not_installed("CVXR")
+  skip_if_not_installed("rrpack")
   r = 3
   gen = generate_example_sparse_U(n=10000, p1=100, p2=10,
                                   r_pca = 5,

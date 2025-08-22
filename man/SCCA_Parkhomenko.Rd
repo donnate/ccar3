@@ -27,6 +27,8 @@ SCCA_Parkhomenko(
 \item{lambda.u.seq}{Vector of sparsity parameters for X (default is a sequence from 0 to 1 with step 0.1)}
 
 \item{Krank}{Number of canonical components to extract}
+
+\item{standardize}{Standardize (center and scale) the data matrices X and Y (default is TRUE) before analysis}
 }
 \value{
 A list with elements:

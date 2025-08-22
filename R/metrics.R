@@ -36,8 +36,9 @@ principal_angles <- function(a, b){
 #' True Positive Rate (TPR)
 #'  This is a function that compares the structure of two matrices A and B.
 #' It outputs the number of entries that A and B have in common that are different from zero. A and B need to have the same number of rows and columns
-#' @param a A matrix.
-#' @param b A matrix.
+#' @param A A matrix.
+#' @param B A matrix.
+#' @param tol tolerance for declaring the entries non zero.
 #' 
 #' @export
 TPR  <-  function(A, B, tol=1e-4){
@@ -53,8 +54,9 @@ TPR  <-  function(A, B, tol=1e-4){
 #' This is a function that compares the structure of two matrices A and B.
 #' It outputs the number of entries where A  is not zero but Bis.
 #' A and B need to have the same number of rows and columns
-#' @param a A matrix.
-#' @param b A matrix.
+#' @param A A matrix.
+#' @param B A matrix.
+#' @param tol tolerance for declaring the entries non zero.
 #' 
 #' @export
 FPR  <-  function(A, B, tol=1e-4){
@@ -69,8 +71,9 @@ FPR  <-  function(A, B, tol=1e-4){
 #' This is a function that compares the structure of two matrices A and B.
 #' It outputs the number of entries where A and B are both 0.
 #' A and B need to have the same number of rows and columns
-#' @param a A matrix.
-#' @param b A matrix.
+#' @param A A matrix.
+#' @param B A matrix.
+#' @param tol tolerance for declaring the entries non zero.
 #' 
 #' @export
 TNR  <-  function(A, B, tol=1e-4){
@@ -85,8 +88,8 @@ TNR  <-  function(A, B, tol=1e-4){
 
 
 #' Calculate subdistance between subspace spanned by the columns of a and the subspace spanned by the columns of b
-#' @param a A matrix whose columns span a subspace.
-#' @param b A matrix whose columns span a subspace.
+#' @param A A matrix whose columns span a subspace.
+#' @param B A matrix whose columns span a subspace.
 #' 
 #' @export
 subdistance <- function(A, B){
@@ -100,8 +103,8 @@ subdistance <- function(A, B){
 
 
 #' sinTheta spanned by the columns of a and the subspace spanned by the columns of b
-#' @param a A matrix whose columns span a subspace.
-#' @param b A matrix whose columns span a subspace.
+#' @param U A matrix whose columns span a subspace.
+#' @param V A matrix whose columns span a subspace.
 #' 
 #' @export
 sinTheta<- function(U, V){

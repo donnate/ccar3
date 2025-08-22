@@ -13,12 +13,14 @@ cca_group_rrr_cv(
   kfolds = 5,
   parallelize = FALSE,
   standardize = FALSE,
-  LW_Sy = FALSE,
+  LW_Sy = TRUE,
   solver = "ADMM",
   rho = 1,
+  thresh_0 = 1e-06,
   niter = 10000,
   thresh = 1e-04,
-  verbose = FALSE
+  verbose = FALSE,
+  nb_cores = NULL
 )
 }
 \arguments{
@@ -34,13 +36,17 @@ cca_group_rrr_cv(
 
 \item{kfolds}{Nb of folds for the CV procedure}
 
+\item{parallelize}{Whether to use parallel processing (default is FALSE)}
+
 \item{standardize}{Whether to scale variables}
 
-\item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
+\item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)}
 
 \item{solver}{Either "ADMM" or "CVXR"}
 
 \item{rho}{ADMM parameter}
+
+\item{thresh_0}{tolerance for declaring entries non-zero}
 
 \item{niter}{Maximum number of ADMM iterations}
 
@@ -48,9 +54,7 @@ cca_group_rrr_cv(
 
 \item{verbose}{Print diagnostics}
 
-\item{Sx}{Optional covariance matrix for X; if NULL computed internally}
-
-\item{Sy}{Optional covariance matrix for Y; if NULL computed internally}
+\item{nb_cores}{Number of cores to use for parallelization (default is all available cores minus 1)}
 }
 \value{
 A list with elements:

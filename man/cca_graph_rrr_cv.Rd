@@ -17,7 +17,10 @@ cca_graph_rrr_cv(
   rho = 10,
   niter = 10000,
   thresh = 1e-04,
-  Gamma_dagger = NULL
+  thresh_0 = 1e-06,
+  verbose = FALSE,
+  Gamma_dagger = NULL,
+  nb_cores = NULL
 )
 }
 \arguments{
@@ -45,15 +48,13 @@ cca_graph_rrr_cv(
 
 \item{thresh}{Convergence threshold for ADMM}
 
-\item{Gamma_dagger}{Optional pseudoinverse of Gamma (computed if NULL)}
-
-\item{Sx}{Optional covariance matrix for X. If NULL, computed as t(X) \%*\% X / n}
-
-\item{Sy}{Optional covariance matrix for Y. If NULL, computed similarly; optionally shrunk via Ledoit-Wolf}
-
-\item{Sxy}{Optional cross-covariance matrix (not currently used)}
+\item{thresh_0}{Threshold for small values in the coefficient matrix (default 1e-6)}
 
 \item{verbose}{Whether to print diagnostic output}
+
+\item{Gamma_dagger}{Optional pseudoinverse of Gamma (computed if NULL)}
+
+\item{nb_cores}{Number of cores to use for parallelization (default is all available cores minus 1)}
 }
 \value{
 A list with elements:

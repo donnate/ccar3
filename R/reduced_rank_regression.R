@@ -58,6 +58,10 @@ solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verb
 
 # Helper: CVXR-based group sparse solver
 solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
+  if (!requireNamespace("CVXR", quietly = TRUE)) {
+    stop("Package 'CVXR' must be installed to use the CVX solver.",
+         call. = FALSE)
+  }
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
   B <- CVXR::Variable(p, q)
@@ -146,6 +150,10 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                               verbose = FALSE)
     } else {
       if(verbose){print("Using gglasso solver")}
+        if (!requireNamespace("rrpack", quietly = TRUE)) {
+          stop("Package 'rrpack' must be installed to use the rrpack solver.",
+              call. = FALSE)
+        }
       fit <- rrpack::cv.srrr(tilde_Y, X, nrank = r, method = "glasso", nfold = 2,
                              modstr = list("lamA" = rep(lambda, 10), "nlam" = 10))
       B_opt <- fit$coef
@@ -180,8 +188,6 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' Canonical Correlation Analysis via Reduced Rank Regression (RRR)
 #' @param X Matrix of predictors.
 #' @param Y Matrix of responses.
-#' @param Sx Optional X covariance matrix.
-#' @param Sy Optional Y covariance matrix.
 #' @param r Rank of the solution.
 #' @param kfolds Number of folds for cross-validation.
 #' @param lambdas Sequence of lambda values for cross-validation.
@@ -193,6 +199,8 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
 #' @param verbose Logical for verbose output.
+#' @param thresh_0 tolerance for declaring entries non-zero
+#' @param nb_cores Number of cores to use for parallelization (default is all available cores minus 1)
 #'
 #' @return A list with elements:
 #' \describe{
@@ -224,7 +232,6 @@ cca_rrr_cv <- function(X, Y,
   n <- nrow(X)
   Sx = matmul(t(X), X) / n
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose = FALSE)) else crossprod(Y) / n
-  print("got here")
   cv_function <- function(lambda) {
     #print(lambda)
     cca_rrr_cv_folds(X, Y, Sx=Sx, Sy=NULL, kfolds=kfolds, 
@@ -235,6 +242,12 @@ cca_rrr_cv <- function(X, Y,
   }
   
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
+
+    if (!requireNamespace("doParallel", quietly = TRUE)) {
+    stop("Package 'doParallel' must be installed to use the parallelization option.",
+         call. = FALSE)
+    }
+
     # --- GRACEFUL PARALLEL SETUP ---
       cl <- setup_parallel_backend(nb_cores)
       
@@ -261,26 +274,18 @@ cca_rrr_cv <- function(X, Y,
   }
   
   resultsx <- resultsx %>% 
-    mutate(rmse = ifelse(is.na(rmse) | rmse == 0, 1e8, rmse)) %>%
-    filter(rmse > 1e-5)
+    dplyr::mutate(rmse = ifelse(is.na(rmse) | rmse == 0, 1e8, rmse)) %>%
+    dplyr::filter(rmse > 1e-5)
   
   opt_lambda <- resultsx$lambda[which.min(resultsx$rmse)]
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
-  print("optimal lambda")
-  
+
   final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, lambda=opt_lambda, r=r,
                    highdim=TRUE, solver=solver,
                    standardize=FALSE, LW_Sy=LW_Sy, rho=rho, niter=niter, 
                    thresh=thresh, thresh_0=thresh_0,verbose=verbose)
-  print("res")
 
-  print(list(U = final$U, 
-             V = final$V,
-             lambda = opt_lambda,
-             #resultsx = resultsx,
-             rmse = resultsx$rmse,
-             cor = sapply(1:r, function(i) stats::cov(X %*% final$U[,i], Y %*% final$V[,i]))
-  ))
+
   return(list(U = final$U, 
        V = final$V,
        lambda = opt_lambda,
@@ -290,11 +295,9 @@ cca_rrr_cv <- function(X, Y,
        ))
 }
 
-#' Cross-validation Fold Evaluation for CCA_rrr
-#'
-#' Evaluates a single value of lambda using k-fold CV.
-#'
-#' @return Average RMSE across folds.
+
+
+
 cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                              lambda=0.01,
                              r=2,
@@ -324,7 +327,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
       final <- cca_rrr(X_train, Y_train, Sx=Sx_train, Sy=NULL, highdim=TRUE,
                        lambda=lambda, r=r, solver=solver,
                        LW_Sy=LW_Sy, standardize=FALSE, rho=rho, niter=niter, 
-                       thresh=thresh,thresh_0=thresh_0,
+                       thresh=thresh, thresh_0=thresh_0,
                        verbose=FALSE)
       mean((X_val %*% final$U - Y_val %*% final$V)^2)
     }, error = function(e) {

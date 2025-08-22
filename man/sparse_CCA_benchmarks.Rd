@@ -27,11 +27,13 @@ sparse_CCA_benchmarks(
 
 \item{kfolds}{Number of cross-validation folds (default is 5)}
 
-\item{method.type}{Type of method to use for Sparse CCA (default is "FIT_SAR_CV"). Choices include "FIT_SAR_BIC", "FIT_SAR_CV", "Witten_Perm", "Witten.CV", "Waaijenborg-Author", "Waaijenborg-CV", and "SCCA_Parkhomenko".}
+\item{method.type}{Type of method to use for Sparse CCA (default is "FIT_SAR_CV"). Choices include "FIT_SAR_BIC", "FIT_SAR_CV", "Witten_Perm", "Witten.CV",  and "SCCA_Parkhomenko".}
 
 \item{lambdax}{Vector of sparsity parameters for X (default is a sequence from 0 to 1 with step 0.1)}
 
 \item{lambday}{Vector of sparsity parameters for Y (default is a sequence from 0 to 1 with step 0.1)}
+
+\item{standardize}{Standardize (center and scale) the data matrices X and Y (default is TRUE) before analysis}
 }
 \value{
 A matrix (p+q)x r containing the canonical directions for X and Y.

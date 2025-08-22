@@ -7,9 +7,9 @@
 sinTheta(U, V)
 }
 \arguments{
-\item{a}{A matrix whose columns span a subspace.}
+\item{U}{A matrix whose columns span a subspace.}
 
-\item{b}{A matrix whose columns span a subspace.}
+\item{V}{A matrix whose columns span a subspace.}
 }
 \description{
 sinTheta spanned by the columns of a and the subspace spanned by the columns of b

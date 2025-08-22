@@ -29,6 +29,8 @@ test_that("cca_group_rrr_cv returns correct output structure", {
 
 
 test_that("cca_group_rrr_cv can run in parallel", {
+  skip_if_not_installed("doParallel")
+  set.seed(123)
   r = 2
   gen = generate_example_group(n=500, p1=100, p2=5, 
                                r_pca = 3,

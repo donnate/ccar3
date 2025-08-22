@@ -14,10 +14,11 @@ cca_graph_rrr(
   lambda = 0,
   r,
   standardize = FALSE,
-  LW_Sy = FALSE,
+  LW_Sy = TRUE,
   rho = 10,
   niter = 10000,
   thresh = 1e-04,
+  thresh_0 = 1e-06,
   verbose = FALSE,
   Gamma_dagger = NULL
 )
@@ -48,6 +49,8 @@ cca_graph_rrr(
 \item{niter}{Maximum number of ADMM iterations}
 
 \item{thresh}{Convergence threshold for ADMM}
+
+\item{thresh_0}{Threshold for small values in the coefficient matrix (default 1e-6)}
 
 \item{verbose}{Whether to print diagnostic output}
 

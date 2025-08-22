@@ -10,9 +10,11 @@ A and B need to have the same number of rows and columns}
 FPR(A, B, tol = 1e-04)
 }
 \arguments{
-\item{a}{A matrix.}
+\item{A}{A matrix.}
 
-\item{b}{A matrix.}
+\item{B}{A matrix.}
+
+\item{tol}{tolerance for declaring the entries non zero.}
 }
 \description{
 False Positive Rate (TPR)

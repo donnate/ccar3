@@ -525,3 +525,4 @@ generate_example_none_trivial_pca <- function(n, p1, p2,
               Sigmax=Sigmax, Sigmay=Sigmay
   ))
 }
+

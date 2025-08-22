@@ -24,6 +24,7 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                                 standardize = FALSE, 
                                 LW_Sy = FALSE, rho = 10,
                                 niter = 1e4, thresh = 1e-4,
+                                thresh_0 = 1e-6,
                                 Gamma_dagger = NULL) {
   
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
@@ -46,10 +47,11 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
     
     tryCatch({
       fit <- cca_graph_rrr(X_train, Y_train, Gamma,
-                           Sx_train, Sy_train, lambda, r,
-                           standardize, 
-                           LW_Sy, rho, niter, thresh,
-                           Gamma_dagger)
+                           Sx_train, Sy_train, lambda, r=r,
+                           standardize=standardize, 
+                           LW_Sy=LW_Sy, rho=rho, niter=niter, thresh=thresh,
+                           thresh_0 = thresh_0,
+                           Gamma_dagger = Gamma_dagger)
 
       mean((X_val %*% fit$U - Y_val %*% fit$V)^2)
     }, error = function(e) {
@@ -70,11 +72,8 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
 #' @param X Matrix of predictors (n x p)
 #' @param Y Matrix of responses (n x q)
 #' @param Gamma Graph constraint matrix (g x p)
-#' @param Sx Optional covariance matrix for X. If NULL, computed as t(X) %*% X / n
-#' @param Sy Optional covariance matrix for Y. If NULL, computed similarly; optionally shrunk via Ledoit-Wolf
 #' @param kfolds Number of folds for cross-validation
 #' @param parallelize Whether to parallelize cross-validation
-#' @param Sxy Optional cross-covariance matrix (not currently used)
 #' @param lambdas Grid of regularization parameters to test for sparsity
 #' @param r Target rank
 #' @param standardize Whether to center and scale X and Y (default FALSE = center only)
@@ -85,6 +84,7 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
 #' @param thresh_0 Threshold for small values in the coefficient matrix (default 1e-6)
 #' @param verbose Whether to print diagnostic output
 #' @param Gamma_dagger Optional pseudoinverse of Gamma (computed if NULL)
+#' @param nb_cores Number of cores to use for parallelization (default is all available cores minus 1)
 #'
 #' @return A list with elements:
 #' \describe{
@@ -135,6 +135,10 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   }
 
     if (parallelize) {
+      if (!requireNamespace("doParallel", quietly = TRUE)) {
+         stop("Package 'doParallel' must be installed to use the parallelization option.",
+         call. = FALSE)
+      }
     # --- GRACEFUL PARALLEL SETUP ---
       cl <- setup_parallel_backend(nb_cores)
       
@@ -157,7 +161,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   }
 
   results$rmse[is.na(results$rmse) | results$rmse == 0] <- 1e8
-  results <- results %>% filter(rmse > 1e-5)
+  results <- results %>% dplyr::filter(rmse > 1e-5)
 
   opt_lambda <- results$lambda[which.min(results$rmse)]
 

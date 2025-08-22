@@ -9,7 +9,7 @@ get_edge_incidence(g, weight = 1)
 \arguments{
 \item{g}{igraph graph object.}
 
-\item{w}{edge weights.}
+\item{weight}{edge weights.}
 }
 \description{
 Return the edge incidence matrix of an igraph graph

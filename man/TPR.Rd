@@ -9,9 +9,11 @@ It outputs the number of entries that A and B have in common that are different 
 TPR(A, B, tol = 1e-04)
 }
 \arguments{
-\item{a}{A matrix.}
+\item{A}{A matrix.}
 
-\item{b}{A matrix.}
+\item{B}{A matrix.}
+
+\item{tol}{tolerance for declaring the entries non zero.}
 }
 \description{
 True Positive Rate (TPR)

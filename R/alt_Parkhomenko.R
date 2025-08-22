@@ -7,6 +7,7 @@
 #' @param lambda.u.seq Vector of sparsity parameters for X (default is a sequence from 0 to 1 with step 0.1)
 #' @param lambda.v.seq Vector of sparsity parameters for Y (default is a sequence from 0 to 1 with step 0.1)
 #' @param Krank Number of canonical components to extract
+#' @param standardize Standardize (center and scale) the data matrices X and Y (default is TRUE) before analysis
 #' @return A list with elements:
 #' \describe{
 #'   \item{U}{Canonical direction matrix for X (p x r)}

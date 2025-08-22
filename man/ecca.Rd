@@ -9,6 +9,9 @@ ecca(
   Y,
   lambda = 0,
   groups = NULL,
+  Sx = NULL,
+  Sy = NULL,
+  Sxy = NULL,
   r = 2,
   standardize = F,
   rho = 1,
@@ -26,6 +29,12 @@ ecca(
 \item{lambda}{Regularization parameter}
 
 \item{groups}{List of index vectors defining groups of predictors}
+
+\item{Sx}{precomputed covariance matrix for X (optional)}
+
+\item{Sy}{precomputed covariance matrix for Y (optional)}
+
+\item{Sxy}{precomputed covariance matrix between X and Y (optional)}
 
 \item{r}{Target rank}
 

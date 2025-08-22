@@ -1,34 +1,50 @@
 Package: ccar3
 Title: Canonical Correlation Analysis via Reduced Rank Regression
-Version: 0.0.0.9000
-Authors@R: 
-    person("Claire", "Donnat", , "cdonnat@uchicago.edu", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: Functions for performing canonical correlation analysis via reduced-rank regression with support for regularization and cross-validation.
+Version: 0.1.0
+Date: 2025-08-22
+Authors@R: c(
+    person("Claire", "Donnat", , "cdonnat@uchicago.edu", 
+           role = c("aut", "cre"),
+           comment = c(ORCID = "https://orcid.org/0000-0001-7079-8060")),
+    person("Elena", "Tuzhilina", , "elena.tuzhilina@utoronto.ca", 
+           role = "aut",
+           comment = c(ORCID = "https://orcid.org/0000-0002-1898-6010")),
+    person("Zixuan", "Wu", , "zixuanwu@uchicago.edu", 
+           role = "aut",
+           comment = c(ORCID = "https://orcid.org/0009-0006-4745-0000")))
+Author: Claire Donnat [aut, cre] (<https://orcid.org/0000-0001-7079-8060>),
+  Elena Tuzhilina [aut] (<https://orcid.org/0000-0002-1898-6010>),
+  Zixuan Wu [aut] (<https://orcid.org/0009-0006-4745-0000>)
+Maintainer: Claire Donnat <cdonnat@uchicago.edu>
+Description: Functions for performing canonical correlation analysis via 
+    reduced-rank regression with support for regularization and cross-validation.
 Depends: R (>= 3.5.0)
 Imports:
-  tidyverse,
-  Matrix,
-  glmnet,
-  rrpack,
-  foreach,
-  pracma,
-  CCA,
-  PMA,
-  MASS,
-  doParallel,
-  corpcor,
-  CVXR,
-  crayon,
-  SMUT,
-  matrixStats,
-  rARPACK,
-  caret
+    purrr,
+    magrittr,
+    tidyr,
+    dplyr,
+    foreach,
+    pracma,
+    igraph,
+    corpcor,
+    crayon,
+    SMUT,
+    stats,
+    matrixStats,
+    RSpectra,
+    caret
+Suggests:
+    testthat (>= 3.0.0),
+    rrpack,
+    CVXR,
+    glmnet,
+    CCA,
+    PMA,
+    doParallel
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
-Suggests: 
-    testthat (>= 3.0.0)
 Config/testthat/edition: 3
 LazyData: true
