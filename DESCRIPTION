@@ -30,11 +30,9 @@ Imports:
     corpcor,
     crayon,
     SMUT,
-    stats,
     matrixStats,
     Matrix,
     RSpectra,
-    rARPACK,
     caret
 Suggests:
     testthat (>= 3.0.0),

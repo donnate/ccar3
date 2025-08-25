@@ -1,7 +1,6 @@
 library(foreach)
 library(caret)
 library(dplyr)
-library(rARPACK)
 library(SMUT)
 library(crayon)
 library(matrixStats)
@@ -426,7 +425,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
       ## Parallel cross validation
       cv = foreach(fold = folds, 
                    .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), 
-                   .packages = c("SMUT", "rARPACK", "crayon"),
+                   .packages = c("SMUT", "crayon"),
                    .errorhandling = 'pass') %dopar% {
                      
                      n_full <- nrow(X)
