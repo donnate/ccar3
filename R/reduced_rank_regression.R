@@ -250,9 +250,22 @@ cca_rrr_cv <- function(X, Y,
    }
 
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
-    resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
+    if (solver  %in% c("CVX", "CVXR" )){
+        if (!requireNamespace("CVXR", quietly = TRUE)) {
+         stop("Package 'CVXR' must be installed to use the CVXR/CVX solver.",
+         call. = FALSE)
+          }
+
+      resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
+
+    }else{
+      resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('Matrix')) %dopar% {
+      data.frame(lambda=lambda, rmse=cv_function(lambda))
+    }
+    }
+    
   } else {
     resultsx <- data.frame(lambda = lambdas)
     resultsx$rmse <- sapply(lambdas, cv_function)

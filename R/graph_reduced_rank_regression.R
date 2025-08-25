@@ -15,7 +15,7 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
   
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
 
-  rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('CVXR', 'Matrix')) %do% {
+  rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('Matrix')) %do% {
     n_full <- nrow(X)
     X_train <- X[-folds[[i]], ]
     Y_train <- Y[-folds[[i]], ]
@@ -146,7 +146,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
    }
 
    if (parallelize) {
-    results <-  foreach(lambda = lambdas, .combine = rbind, .packages = c('CVXR', 'Matrix')) %dopar% run_cv(lambda)
+    results <-  foreach(lambda = lambdas, .combine = rbind, .packages = c('Matrix')) %dopar% run_cv(lambda)
   } else {
     results <- purrr::map_dfr(lambdas, run_cv)
   }
