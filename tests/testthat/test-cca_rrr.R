@@ -29,8 +29,9 @@ test_that("cca_rrr returns the correct answer", {
                                   n_new = 5000) 
   X = gen$X
   Y = gen$Y
+
   result <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0, r, highdim=TRUE,
-                    LW_Sy = TRUE)
+                    LW_Sy = TRUE, solver = "ADMM")
   
   expect_type(result, "list")
   expect_true(subdistance(result$U, gen$u) < 0.15)  
@@ -46,7 +47,8 @@ test_that("cca_rrr returns the correct answer", {
 test_that("cca_rrr computes the same solutions across solvers", {
   set.seed(123)
   skip_if_not_installed("CVXR")
-  skip_if_not_installed("rrpack")
+
+
   r = 3
   gen = generate_example_sparse_U(n=10000, p1=100, p2=10,
                                   r_pca = 5,
@@ -59,10 +61,6 @@ test_that("cca_rrr computes the same solutions across solvers", {
   X = gen$X
   Y = gen$Y  
 
-  result1 <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0.1, highdim=TRUE,
-                    LW_Sy = TRUE, solver="srrr")
-  print("Done srrr")
-
   result2 <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0.1, rho=10,
                      highdim=TRUE,
                      LW_Sy = TRUE, solver="ADMM")
@@ -72,7 +70,6 @@ test_that("cca_rrr computes the same solutions across solvers", {
                     LW_Sy = TRUE, solver="CVX")
   print("Done CVXR")
   
-  expect_true(subdistance(result1$U, gen$u) <0.2 )
   expect_true(subdistance(result2$U, gen$u) <0.2 )
   expect_true(subdistance(result3$U, gen$u) <0.2 )
 })

@@ -1,6 +1,8 @@
 library(ccar3)
 
 test_that("cca_graph returns correct output structure", {
+  skip_if_not_installed("igraph")
+
   set.seed(123)
   r = 2
   gen = generate_example_graph(n=500, p1=10, p2=5, 
@@ -27,6 +29,8 @@ test_that("cca_graph returns correct output structure", {
 
 
 test_that("cca_graph returns the correct answer", {
+  skip_if_not_installed("igraph")
+
 
   ##### Generate toy example data
   set.seed(123)

@@ -2,6 +2,8 @@ library(ccar3)
 
 test_that("cca_graph_rrr_cv returns correct output structure", {
   set.seed(123)
+  skip_if_not_installed("igraph")
+
   r = 2
   gen = generate_example_graph(n=500, p1=10, p2=5, 
                                r_pca = 3,
@@ -29,6 +31,8 @@ test_that("cca_graph_rrr_cv returns correct output structure", {
 
 
 test_that("cca_graph_rrr_cv can run in parallel", {
+  skip_if_not_installed("igraph")
+
   r = 2
   gen = generate_example_graph(n=500, p1=10, p2=5, 
                                r_pca = 3,
@@ -51,6 +55,8 @@ test_that("cca_graph_rrr_cv can run in parallel", {
 
 
 test_that("cca_graph_rrr_cv returns the correct answer", {
+  skip_if_not_installed("igraph")
+
   
   ##### Generate toy example data
   set.seed(123)
