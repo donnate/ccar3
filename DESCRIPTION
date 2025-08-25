@@ -28,20 +28,20 @@ Imports:
     pracma,
     igraph,
     corpcor,
-    crayon,
-    SMUT,
     matrixStats,
     Matrix,
     RSpectra,
     caret
 Suggests:
+    SMUT,
     testthat (>= 3.0.0),
     rrpack,
     CVXR,
     glmnet,
     CCA,
     PMA,
-    doParallel
+    doParallel,
+    crayon
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

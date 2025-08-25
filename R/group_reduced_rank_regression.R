@@ -5,9 +5,14 @@ library(foreach)
 library(SMUT)
 
 
-
-matmul = function(A, B){
-  SMUT::eigenMapMatMult(A, B)
+matmul <- function(A, B) {
+  if (requireNamespace("SMUT", quietly = TRUE)) {
+    # Use the fast C++ multiplication from SMUT
+    SMUT::eigenMapMatMult(A, B)
+  } else {
+    # Fallback to base R multiplication
+    A %*% B
+  }
 }
 
 
@@ -267,8 +272,8 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
           call. = FALSE)
       }
 
-      if (!requireNamespace("parallel", quietly = TRUE)) {
-      stop("Package 'parallel' must be installed to use the parallelization option.",
+      if (!requireNamespace("crayon", quietly = TRUE)) {
+      stop("Package 'crayon' must be installed to use the parallelization option.",
           call. = FALSE)
       }
     # --- GRACEFUL PARALLEL SETUP ---

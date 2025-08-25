@@ -1,5 +1,14 @@
 library(ccar3)
 
+
+test_that("SMUT multiplication works if available", {
+  skip_if_not_installed("SMUT")
+  A <- matrix(rnorm(100), 10)
+  B <- matrix(rnorm(100), 10)
+  expect_equal(SMUT::eigenMapMatMult(A, B), A %*% B, tolerance = 1e-10)
+})
+
+
 test_that("ecca returns correct output structure", {
   
   
