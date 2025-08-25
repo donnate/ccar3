@@ -1,7 +1,6 @@
-library(Matrix)
 library(pracma)
 library(caret)
-library(igraph)
+
 
 generate_example_sparse_U <- function(n, p1, p2,
                                       r_pca = 3,
@@ -263,7 +262,7 @@ generate_example_graph <- function(n, p1 = 10,
                                             r_pca = 3,
                                             nnzeros = 5,
                                             do_plot = FALSE,
-                                            theta = thetas,
+                                            theta = diag(c(0.9,  0.8)),
                                             lambda_pca = 1,
                                             nnzeros_pca = 10,
                                             r = 2, overlapping_amount = 0,
@@ -289,13 +288,18 @@ generate_example_graph <- function(n, p1 = 10,
   # u: ground truth for u
   # v: ground truth for v
   ###
+
+  if (!requireNamespace("igraph", quietly = TRUE)) {
+  stop("Package 'igraph' must be installed to use generate_example_graph().", call. = FALSE)
+  }
+
   if (type_graph == "2d-grid"){
-    g <- make_lattice(c(p1, p1))
+    g <- igraph::make_lattice(c(p1, p1))
   }else{
-    g <- sample_pa(p1, power=1.2)
+    g <- igraph::sample_pa(p1, power=1.2)
   }
   prop_g <- get_edge_incidence(g, weight = 1)
-  p1<-length(V(g))
+  p1<-length(igraph::V(g))
   p_tot <- p1 + p2
   
   pp <- c(p1, p2)
@@ -360,7 +364,7 @@ generate_example_graph <- function(n, p1 = 10,
     s <- sample(1:p1, nnzeros)
     for (ss in s){
       ### sample neighborhood
-      ind <- as.numeric(neighborhood(g, order=order, nodes = ss)[[1]])
+      ind <- as.numeric(igraph::neighborhood(g, order=order, nodes = ss)[[1]])
       for(rr in 1:r){
         prod[ind, rr] <- runif(1, max = 3, min=1)  *  sample(c(-1,1),1)
       }
@@ -410,8 +414,7 @@ generate_example_graph <- function(n, p1 = 10,
               v=v, #pracma::sqrtm(Sigma[(p1+1):(p1+p2), (p1+1):(p1+p2)])$Binv %*% GT$v, 
               Xnew = Xnew, Ynew=Ynew,
               Sigmax=Sigmax, Sigmay=Sigmay,
-              Gamma=prop_g,
-              groups = groups
+              Gamma=prop_g
   ))
   
 }

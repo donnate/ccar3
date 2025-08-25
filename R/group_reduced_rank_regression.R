@@ -166,8 +166,15 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
                                    verbose = FALSE) {
   
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
-  
-  rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c( "Matrix")) %do% {
+  if (solver == "CVXR"){
+    if (!requireNamespace("CVXR", quietly = TRUE)) {
+       stop("Package 'CVXR' must be installed to use the CVXR solver.", call. = FALSE)
+    }
+    packages_list <- c("CVXR", "Matrix")
+  } else {
+    packages_list <- c()
+  }
+  rmse <- foreach(i = seq_along(folds), .combine = c, .packages = packages_list) %do% {
     n <- nrow(X)
     X_train <- X[-folds[[i]], ]; Y_train <- Y[-folds[[i]], ]
     X_val <- X[folds[[i]], ]; Y_val <- Y[folds[[i]], ]

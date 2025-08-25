@@ -261,7 +261,7 @@ cca_rrr_cv <- function(X, Y,
     }
 
     }else{
-      resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('Matrix')) %dopar% {
+      resultsx <- foreach(lambda=lambdas, .combine=rbind) %dopar% {
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
     }

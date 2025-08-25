@@ -149,8 +149,14 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   # U0 = SVD$u[, 1:r, drop = F]
   # V0 = SVD$v[, 1:r, drop = F]
   # L0 = SVD$d[1:r]
-  
-  SVD = RSpectra::svds(C, r)
+
+    if (requireNamespace("RSpectra", quietly = TRUE)) {
+    SVD <- RSpectra::svds(C, r)
+  } else {
+    SVD <- svd(C, nu=r, nv=r)
+  }
+
+
   U0 = SVD$u
   V0 = SVD$v
   L0 = SVD$d

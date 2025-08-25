@@ -146,7 +146,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
    }
 
    if (parallelize) {
-    results <-  foreach(lambda = lambdas, .combine = rbind, .packages = c('Matrix')) %dopar% run_cv(lambda)
+    results <-  foreach(lambda = lambdas, .combine = rbind) %dopar% run_cv(lambda)
   } else {
     results <- purrr::map_dfr(lambdas, run_cv)
   }
