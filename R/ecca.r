@@ -1,6 +1,5 @@
 library(foreach)
 library(caret)
-library(doParallel)
 library(dplyr)
 library(rARPACK)
 library(SMUT)
