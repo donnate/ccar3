@@ -1,20 +1,7 @@
 library(magrittr)
 library(tidyr)
-library(SMUT) # Required for eigenMapMatMult
 library(pracma) # Required for pinv
 library(caret) # Required for createFolds
-
-
-matmul <- function(A, B) {
-  if (requireNamespace("SMUT", quietly = TRUE)) {
-    # Use the fast C++ multiplication from SMUT
-    SMUT::eigenMapMatMult(A, B)
-  } else {
-    # Fallback to base R multiplication
-    A %*% B
-  }
-}
-
 
 
 cca_graph_rrr_cv_folds <- function(X, Y, Gamma,

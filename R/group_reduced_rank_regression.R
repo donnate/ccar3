@@ -2,18 +2,6 @@
 library(dplyr)
 library(magrittr)
 library(foreach)
-library(SMUT)
-
-
-matmul <- function(A, B) {
-  if (requireNamespace("SMUT", quietly = TRUE)) {
-    # Use the fast C++ multiplication from SMUT
-    SMUT::eigenMapMatMult(A, B)
-  } else {
-    # Fallback to base R multiplication
-    A %*% B
-  }
-}
 
 
 # Helper: ADMM-based group sparse solver

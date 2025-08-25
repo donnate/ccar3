@@ -1,57 +1,10 @@
 library(foreach)
 library(caret)
 library(dplyr)
-library(SMUT)
-library(crayon)
 library(matrixStats)
 
 #' @importFrom magrittr %>%
 #' @importFrom tidyr replace_na
-
-
-soft_thresh = function(A, lambda){
-  #A * pmax(1 - lambda / abs(A), 0)
-  sign(A) * pmax(abs(A) - lambda, 0)
-}
-
-fnorm = function(A){
-  sqrt(sum(A^2))
-}
-
-
-
-soft_thresh_group = function(A, lambda){
-  norm_A <- sqrt(sum(A^2))
-  if (norm_A == 0) return(A)
-  A * pmax(0, 1 - lambda / norm_A)
-}
-
-
-
-soft_thresh2 <- function(A, lambda){
-  norm_A <- sqrt(sum(A^2))
-  if(norm_A == 0){
-    return(A)
-  }
-  result = A * pmax(1 - lambda/(norm_A), 0)
-  return(result)
-}
-
-matmul <- function(A, B) {
-  if (requireNamespace("SMUT", quietly = TRUE)) {
-    # Use the fast C++ multiplication from SMUT
-    SMUT::eigenMapMatMult(A, B)
-  } else {
-    # Fallback to base R multiplication
-    A %*% B
-  }
-}
-
-
-rmat = function(n, p){
-  matrix(rnorm(n * p), n, p)
-}
-
 
 #' Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensiona;
 #'

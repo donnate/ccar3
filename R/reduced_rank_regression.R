@@ -1,30 +1,7 @@
 # Required libraries
 library(dplyr)
 library(magrittr)
-library(SMUT)
 library(foreach)
-
-# Helper functions
-compute_sqrt_inv <- function(S, threshold = 1e-4) {
-  svd_S <- svd(S)
-  svd_S$u %*% diag(sapply(svd_S$d, function(x) ifelse(x > threshold, 1 / sqrt(x), 0))) %*% t(svd_S$v)
-}
-
-compute_sqrt <- function(S, threshold = 1e-4) {
-  svd_S <- svd(S)
-  svd_S$u %*% diag(sapply(svd_S$d, function(x) ifelse(x > threshold, sqrt(x), 0))) %*% t(svd_S$u)
-}
-
-
-matmul <- function(A, B) {
-  if (requireNamespace("SMUT", quietly = TRUE)) {
-    # Use the fast C++ multiplication from SMUT
-    SMUT::eigenMapMatMult(A, B)
-  } else {
-    # Fallback to base R multiplication
-    A %*% B
-  }
-}
 
 
 
