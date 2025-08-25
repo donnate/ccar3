@@ -1,8 +1,5 @@
 # LIBRARIES
-library(glmnet)
 library(MASS)
-#library(pls)
-library(CCA)
 
 
 #' Function to perform Sparse CCA based on Wilms and Croux (2018)

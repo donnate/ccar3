@@ -1,16 +1,8 @@
-library(dplyr)
+library(magrittr)
 library(tidyr)
-library(Matrix)
-library(glmnet)
-library(gglasso)
-library(rrpack)
-library(foreach)
-library(doParallel)
-library(CVXR)
 library(SMUT) # Required for eigenMapMatMult
 library(pracma) # Required for pinv
 library(caret) # Required for createFolds
-library(parallel) # Required for detectCores
 
 
 matmul = function(A, B){
@@ -136,8 +128,13 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
 
     if (parallelize) {
       if (!requireNamespace("doParallel", quietly = TRUE)) {
-         stop("Package 'doParallel' must be installed to use the parallelization option.",
-         call. = FALSE)
+      stop("Package 'doParallel' must be installed to use the parallelization option.",
+          call. = FALSE)
+      }
+
+      if (!requireNamespace("parallel", quietly = TRUE)) {
+      stop("Package 'parallel' must be installed to use the parallelization option.",
+          call. = FALSE)
       }
     # --- GRACEFUL PARALLEL SETUP ---
       cl <- setup_parallel_backend(nb_cores)

@@ -1,11 +1,3 @@
-
-# source("R/alt_Parkhomenko.R")
-# source("R/alt_SAR.R")
-# source("R/alt_Waaijenborg.R")
-# source("R/alt_Witten_CrossValidation.R")
-# source("R/utils.R")
-
-library(PMA)
 #' @title Additional Benchmarks for Sparse CCA Methods
 #' @param X_train Matrix of predictors (n x p)
 #' @param Y_train  Matrix of responses (n x q)

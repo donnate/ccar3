@@ -1,4 +1,3 @@
-library(PMA)
 #' Sparse CCA by Witten and Tibshirani (2009)
 #'
 #' @param X Matrix of predictors (n x p)

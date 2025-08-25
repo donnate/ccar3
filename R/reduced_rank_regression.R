@@ -1,12 +1,8 @@
 # Required libraries
-library(tidyverse)
-library(Matrix)
-library(glmnet)
-library(gglasso)
+library(dplyr)
+library(magrittr)
 library(SMUT)
-library(rrpack)
 library(foreach)
-library(doParallel)
 
 # Helper functions
 compute_sqrt_inv <- function(S, threshold = 1e-4) {
@@ -62,6 +58,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
     stop("Package 'CVXR' must be installed to use the CVX solver.",
          call. = FALSE)
   }
+
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
   B <- CVXR::Variable(p, q)
@@ -245,6 +242,11 @@ cca_rrr_cv <- function(X, Y,
 
     if (!requireNamespace("doParallel", quietly = TRUE)) {
     stop("Package 'doParallel' must be installed to use the parallelization option.",
+         call. = FALSE)
+    }
+
+    if (!requireNamespace("parallel", quietly = TRUE)) {
+    stop("Package 'parallel' must be installed to use the parallelization option.",
          call. = FALSE)
     }
 

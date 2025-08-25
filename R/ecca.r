@@ -399,8 +399,13 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
     
     if (parallel) {
       if (!requireNamespace("doParallel", quietly = TRUE)) {
-         stop("Package 'doParallel' must be installed to use the parallelization option.",
-         call. = FALSE)
+      stop("Package 'doParallel' must be installed to use the parallelization option.",
+          call. = FALSE)
+      }
+
+      if (!requireNamespace("parallel", quietly = TRUE)) {
+      stop("Package 'parallel' must be installed to use the parallelization option.",
+          call. = FALSE)
       }
     # --- GRACEFUL PARALLEL SETUP ---
       cl <- setup_parallel_backend(nb_cores)
