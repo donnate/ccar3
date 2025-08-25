@@ -2,7 +2,7 @@
 % Please edit documentation in R/ecca.r
 \name{ecca}
 \alias{ecca}
-\title{Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensiona;}
+\title{Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensional.}
 \usage{
 ecca(
   X,

@@ -5,10 +5,10 @@ library(matrixStats)
 
 #' @importFrom magrittr %>%
 #' @importFrom tidyr replace_na
-
-#' Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensiona;
 #'
-#' Performs group-sparse reduced-rank regression for CCA using either ADMM or CVXR solvers.
+#' @title Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensional.
+#'
+#' @description Performs group-sparse reduced-rank regression for CCA using either ADMM or CVXR solvers.
 #'
 #' @param X Predictor matrix (n x p)
 #' @param Y Response matrix (n x q)
