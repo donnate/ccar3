@@ -5,6 +5,7 @@ library(matrixStats)
 
 #' @importFrom magrittr %>%
 #' @importFrom tidyr replace_na
+#' @importFrom stats cor cov median rnorm sd var
 #'
 #' @title Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensional.
 #'
