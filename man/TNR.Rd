@@ -2,23 +2,20 @@
 % Please edit documentation in R/metrics.R
 \name{TNR}
 \alias{TNR}
-\title{True Negative Rate (TPR)
-This is a function that compares the structure of two matrices A and B.
-It outputs the number of entries where A and B are both 0.
-A and B need to have the same number of rows and columns}
+\title{True Negative Rate (TNR)}
 \usage{
 TNR(A, B, tol = 1e-04)
 }
 \arguments{
 \item{A}{A matrix.}
 
-\item{B}{A matrix.}
+\item{B}{A matrix (assumed to be the ground truth)..}
 
 \item{tol}{tolerance for declaring the entries non zero.}
 }
+\value{
+True Negative Rate (nb of values that are zero in A and  zero in B / (nb of values that are  zero in A))
+}
 \description{
-True Negative Rate (TPR)
-This is a function that compares the structure of two matrices A and B.
-It outputs the number of entries where A and B are both 0.
-A and B need to have the same number of rows and columns
+This is a function that compares the structure of two matrices A and B. It outputs the number of entries where A and B are both 0. A and B need to have the same number of rows and columns
 }

@@ -279,6 +279,7 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
         if (verbose){
           cat(crayon::green("Parallel backend successfully registered.\n"))
         }
+
         doParallel::registerDoParallel(cl)
         on.exit(parallel::stopCluster(cl), add = TRUE)
       } else {

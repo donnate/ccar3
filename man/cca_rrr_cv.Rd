@@ -55,12 +55,12 @@ cca_rrr_cv(
 }
 \value{
 A list with elements:
-\describe{
-\item{U}{Canonical direction matrix for X (p x r)}
-\item{V}{Canonical direction matrix for Y (q x r)}
-\item{lambda}{Optimal regularisation parameter lambda chosen by CV}
-\item{rmse}{Mean squared error of prediction (as computed in the CV)}
-\item{cor}{Canonical correlations}
+\itemize{
+\item U: Canonical direction matrix for X (p x r)
+\item V: Canonical direction matrix for Y (q x r)
+\item lambda: Optimal regularisation parameter lambda chosen by CV
+\item rmse: Mean squared error of prediction (as computed in the CV)
+\item cor: Canonical correlations
 }
 }
 \description{

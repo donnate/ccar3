@@ -23,7 +23,7 @@ Description: Functions for performing canonical correlation analysis via
     For both methods, standard l1 regularization as well as group-lasso regularization are available. cca_graph_rrr further supports total variation regularization
     when there is a known graph structure among the variables of the high-dimensional dataset. In this case, the loadings of the canonical directions of the high-dimensional dataset are assumed 
     to be smooth on the graph.
-    For more details see Donnat and Tuzhilina (2024) <https://arxiv.org/abs/2405.19539> and Wu, Tuzhilina and Donnat (2025) <https://arxiv.org/abs/2507.11160>.
+    For more details see Donnat and Tuzhilina (2024) <arXiv:2405.19539> and Wu, Tuzhilina and Donnat (2025) <arXiv:2507.11160>.
 Depends: R (>= 3.5.0)
 Imports:
     purrr,

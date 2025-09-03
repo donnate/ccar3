@@ -4,10 +4,12 @@
 \alias{setup_parallel_backend}
 \title{Set up a parallel backend with graceful fallbacks.}
 \usage{
-setup_parallel_backend(num_cores = NULL)
+setup_parallel_backend(num_cores = NULL, verbose = FALSE)
 }
 \arguments{
 \item{num_cores}{The number of cores to use. If NULL, it's determined automatically.}
+
+\item{verbose}{If TRUE, prints messages about the setup process.}
 }
 \value{
 A cluster object \code{cl} on success, or \code{NULL} on failure.

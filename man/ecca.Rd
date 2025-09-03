@@ -13,12 +13,12 @@ ecca(
   Sy = NULL,
   Sxy = NULL,
   r = 2,
-  standardize = F,
+  standardize = FALSE,
   rho = 1,
   B0 = NULL,
   eps = 1e-04,
   maxiter = 500,
-  verbose = T
+  verbose = TRUE
 )
 }
 \arguments{

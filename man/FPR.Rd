@@ -2,23 +2,25 @@
 % Please edit documentation in R/metrics.R
 \name{FPR}
 \alias{FPR}
-\title{False Positive Rate (TPR)
-This is a function that compares the structure of two matrices A and B.
-It outputs the number of entries where A  is not zero but Bis.
-A and B need to have the same number of rows and columns}
+\title{False Positive Rate (TPR)}
 \usage{
 FPR(A, B, tol = 1e-04)
 }
 \arguments{
 \item{A}{A matrix.}
 
-\item{B}{A matrix.}
+\item{B}{A matrix (assumed to be the ground truth).}
 
 \item{tol}{tolerance for declaring the entries non zero.}
 }
+\value{
+False Positive Rate (nb of values that are non zero in A and  zero in B / (nb of values that are non zero in A))
+}
 \description{
-False Positive Rate (TPR)
-This is a function that compares the structure of two matrices A and B.
-It outputs the number of entries where A  is not zero but Bis.
-A and B need to have the same number of rows and columns
+This is a function that compares the structure of two matrices A and B. It outputs the number of entries where A  is not zero but Bis. A and B need to have the same number of rows and columns
+}
+\examples{
+A <- matrix(c(1, 0, 0, 1, 1, 0), nrow = 2)
+B <- matrix(c(1, 0, 1, 1, 0, 0), nrow = 2)
+FPR(A, B)  
 }

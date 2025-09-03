@@ -55,11 +55,11 @@ cca_rrr(
 }
 \value{
 A list with elements:
-\describe{
-\item{U}{Canonical direction matrix for X (p x r)}
-\item{V}{Canonical direction matrix for Y (q x r)}
-\item{cor}{Canonical covariances}
-\item{loss}{The prediction error 1/n * \| XU - YV\|^2}
+\itemize{
+\item U: Canonical direction matrix for X (p x r)
+\item V: Canonical direction matrix for Y (q x r)
+\item cor: Canonical covariances
+\item loss: The prediction error 1/n * || XU - YV ||^2
 }
 }
 \description{

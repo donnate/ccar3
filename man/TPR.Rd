@@ -2,21 +2,25 @@
 % Please edit documentation in R/metrics.R
 \name{TPR}
 \alias{TPR}
-\title{True Positive Rate (TPR)
-This is a function that compares the structure of two matrices A and B.
-It outputs the number of entries that A and B have in common that are different from zero. A and B need to have the same number of rows and columns}
+\title{True Positive Rate (TPR)}
 \usage{
 TPR(A, B, tol = 1e-04)
 }
 \arguments{
-\item{A}{A matrix.}
+\item{A}{A matrix (the estimator).}
 
-\item{B}{A matrix.}
+\item{B}{A matrix (assumed to be the ground truth).}
 
 \item{tol}{tolerance for declaring the entries non zero.}
 }
+\value{
+True Positive Rate (nb of values that are non zero in both A and B / (nb of values that are non zero in A))
+}
 \description{
-True Positive Rate (TPR)
-This is a function that compares the structure of two matrices A and B.
-It outputs the number of entries that A and B have in common that are different from zero. A and B need to have the same number of rows and columns
+This is a function that compares the structure of two matrices A and B.  It outputs the number of entries that A and B have in common that are different from zero. A and B need to have the same number of rows and columns
+}
+\examples{
+A <- matrix(c(1, 0, 0, 1, 1, 0), nrow = 2)
+B <- matrix(c(1, 0, 1, 1, 0, 0), nrow = 2)
+TPR(A, B)  
 }

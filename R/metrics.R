@@ -2,11 +2,15 @@
 # AUXILIARLY FUNCTIONS SIMULATION STUDY #
 #########################################
 
-
-#' Calculate principal angles between subspace spanned by the columns of a and the subspace spanned by the columns of b
+#' @title Metrics for subspaces
+#' @description Calculate principal angles between subspace spanned by the columns of a and the subspace spanned by the columns of b
 #' @param a A matrix whose columns span a subspace.
 #' @param b A matrix whose columns span a subspace.
-#' returns a vector of principal angles (in radians)
+#' @return  a vector of principal angles (in radians)
+#' @examples
+#' a <- matrix(rnorm(9), 3, 3)
+#' b <- matrix(rnorm(9), 3, 3)
+#' principal_angles(a, b)
 #' @export
 principal_angles <- function(a, b){
   ### Calculate principal angles between subspace spanned by the columns of a and the subspace spanned by the columns of b
@@ -34,13 +38,19 @@ principal_angles <- function(a, b){
 }
 
 
-#' True Positive Rate (TPR)
-#'  This is a function that compares the structure of two matrices A and B.
-#' It outputs the number of entries that A and B have in common that are different from zero. A and B need to have the same number of rows and columns
+
+
+#' @title True Positive Rate (TPR)
+#' 
+#' @description This is a function that compares the structure of two matrices A and B.  It outputs the number of entries that A and B have in common that are different from zero. A and B need to have the same number of rows and columns
 #' @param A A matrix (the estimator).
 #' @param B A matrix (assumed to be the ground truth).
 #' @param tol tolerance for declaring the entries non zero.
 #' @return True Positive Rate (nb of values that are non zero in both A and B / (nb of values that are non zero in A))
+#' @examples
+#' A <- matrix(c(1, 0, 0, 1, 1, 0), nrow = 2)
+#' B <- matrix(c(1, 0, 1, 1, 0, 0), nrow = 2)
+#' TPR(A, B)  
 #' @export
 TPR  <-  function(A, B, tol=1e-4){
 
@@ -51,14 +61,17 @@ TPR  <-  function(A, B, tol=1e-4){
 }
 
 
-#' False Positive Rate (TPR)
-#' This is a function that compares the structure of two matrices A and B.
-#' It outputs the number of entries where A  is not zero but Bis.
-#' A and B need to have the same number of rows and columns
+
+#' @title False Positive Rate (TPR)
+#' @description This is a function that compares the structure of two matrices A and B. It outputs the number of entries where A  is not zero but Bis. A and B need to have the same number of rows and columns
 #' @param A A matrix.
 #' @param B A matrix (assumed to be the ground truth).
 #' @param tol tolerance for declaring the entries non zero.
 #' @return False Positive Rate (nb of values that are non zero in A and  zero in B / (nb of values that are non zero in A))
+#' @examples
+#' A <- matrix(c(1, 0, 0, 1, 1, 0), nrow = 2)
+#' B <- matrix(c(1, 0, 1, 1, 0, 0), nrow = 2)
+#' FPR(A, B)  
 #' @export
 FPR  <-  function(A, B, tol=1e-4){
   A[which(abs(A) <tol)] =0
@@ -68,10 +81,10 @@ FPR  <-  function(A, B, tol=1e-4){
 }
 
 
+
 #' True Negative Rate (TNR)
-#' This is a function that compares the structure of two matrices A and B.
-#' It outputs the number of entries where A and B are both 0.
-#' A and B need to have the same number of rows and columns
+#' 
+#' @description This is a function that compares the structure of two matrices A and B. It outputs the number of entries where A and B are both 0. A and B need to have the same number of rows and columns
 #' @param A A matrix.
 #' @param B A matrix (assumed to be the ground truth)..
 #' @param tol tolerance for declaring the entries non zero.
@@ -88,10 +101,12 @@ TNR  <-  function(A, B, tol=1e-4){
 }
 
 
-#' Calculate subdistance between subspace spanned by the columns of a and the subspace spanned by the columns of b
+
+#' @title Subdistance between subspaces
+#' @description Calculate subdistance between subspace spanned by the columns of a and the subspace spanned by the columns of b
 #' @param A A matrix whose columns span a subspace.
 #' @param B A matrix whose columns span a subspace.
-#' @return subdistance between the two subspaces spanned by the matrices A and B, defined as min_{O orthogonal} ||AO-B||_F
+#' @return subdistance between the two subspaces spanned by the matrices A and B, defined as min(O orthogonal) ||AO-B||_F
 #' @export
 subdistance <- function(A, B){
   svdresult = svd(t(A) %*% B);
@@ -103,7 +118,9 @@ subdistance <- function(A, B){
 }
 
 
-#' sinTheta spanned by the columns of a and the subspace spanned by the columns of b
+
+#' @title SinTheta distance between subspaces
+#' @description Calculate the distance spanned by the columns of A and the subspace spanned by the columns of B, defined as ||UU^T - VV^T||_F / sqrt(2)
 #' @param U A matrix whose columns span a subspace.
 #' @param V A matrix whose columns span a subspace.
 #' @return sinTheta distance between the two subspaces spanned by the matrices A and B, defined as ||UU^T - VV^T||_F / sqrt(2)

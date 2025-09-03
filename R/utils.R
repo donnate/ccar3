@@ -31,6 +31,7 @@ gca_to_cca <-
 #' returning NULL if all attempts fail.
 #'
 #' @param num_cores The number of cores to use. If NULL, it's determined automatically.
+#' @param verbose If TRUE, prints messages about the setup process.
 #' @return A cluster object `cl` on success, or `NULL` on failure.
 
 setup_parallel_backend <- function(num_cores = NULL, verbose = FALSE) {

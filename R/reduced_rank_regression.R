@@ -77,12 +77,13 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
 #' @param verbose Logical for verbose output.
 #'
 #' @return A list with elements:
-#' \describe{
-#'   \item{U}{Canonical direction matrix for X (p x r)}
-#'   \item{V}{Canonical direction matrix for Y (q x r)}
-#'   \item{cor}{Canonical covariances}
-#'   \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
+#' \itemize{
+#'   \item U: Canonical direction matrix for X (p x r)
+#'   \item V: Canonical direction matrix for Y (q x r)
+#'   \item cor: Canonical covariances
+#'   \item loss: The prediction error 1/n * || XU - YV ||^2
 #' }
+
 #' @export
 cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                     lambda = 0, 
@@ -184,12 +185,12 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param nb_cores Number of cores to use for parallelization (default is all available cores minus 1)
 #'
 #' @return A list with elements:
-#' \describe{
-#'   \item{U}{Canonical direction matrix for X (p x r)}
-#'   \item{V}{Canonical direction matrix for Y (q x r)}
-#'   \item{lambda}{Optimal regularisation parameter lambda chosen by CV}
-#'   \item{rmse}{Mean squared error of prediction (as computed in the CV)}
-#'   \item{cor}{Canonical correlations}
+#' \itemize{
+#'   \item U: Canonical direction matrix for X (p x r)
+#'   \item V: Canonical direction matrix for Y (q x r)
+#'   \item lambda: Optimal regularisation parameter lambda chosen by CV
+#'   \item rmse: Mean squared error of prediction (as computed in the CV)
+#'   \item cor: Canonical correlations
 #' }
 #' @importFrom foreach foreach %dopar%
 #' @importFrom foreach foreach %do%

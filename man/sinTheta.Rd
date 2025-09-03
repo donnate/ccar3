@@ -2,7 +2,7 @@
 % Please edit documentation in R/metrics.R
 \name{sinTheta}
 \alias{sinTheta}
-\title{sinTheta spanned by the columns of a and the subspace spanned by the columns of b}
+\title{SinTheta distance between subspaces}
 \usage{
 sinTheta(U, V)
 }
@@ -11,6 +11,9 @@ sinTheta(U, V)
 
 \item{V}{A matrix whose columns span a subspace.}
 }
+\value{
+sinTheta distance between the two subspaces spanned by the matrices A and B, defined as ||UU^T - VV^T||_F / sqrt(2)
+}
 \description{
-sinTheta spanned by the columns of a and the subspace spanned by the columns of b
+Calculate the distance spanned by the columns of A and the subspace spanned by the columns of B, defined as ||UU^T - VV^T||_F / sqrt(2)
 }

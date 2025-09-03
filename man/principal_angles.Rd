@@ -2,7 +2,7 @@
 % Please edit documentation in R/metrics.R
 \name{principal_angles}
 \alias{principal_angles}
-\title{Calculate principal angles between subspace spanned by the columns of a and the subspace spanned by the columns of b}
+\title{Metrics for subspaces}
 \usage{
 principal_angles(a, b)
 }
@@ -11,6 +11,14 @@ principal_angles(a, b)
 
 \item{b}{A matrix whose columns span a subspace.}
 }
+\value{
+a vector of principal angles (in radians)
+}
 \description{
 Calculate principal angles between subspace spanned by the columns of a and the subspace spanned by the columns of b
+}
+\examples{
+a <- matrix(rnorm(9), 3, 3)
+b <- matrix(rnorm(9), 3, 3)
+principal_angles(a, b)
 }
