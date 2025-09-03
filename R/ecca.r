@@ -35,8 +35,8 @@ library(matrixStats)
 #' }
 #' @export
 ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
-                Sy = NULL, Sxy = NULL, r = 2,  standardize = F,
-                rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = T){
+                Sy = NULL, Sxy = NULL, r = 2,  standardize = FALSE,
+                rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = TRUE){
   
   p = ncol(X)
   q = ncol(Y)
@@ -57,8 +57,8 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   else B = B0
   
   
-  EDx = eigen(Sx, symmetric = T)
-  EDy = eigen(Sy, symmetric = T)
+  EDx = eigen(Sx, symmetric = TRUE)
+  EDy = eigen(Sy, symmetric = TRUE)
   
   Ux = EDx$vectors
   Lx = EDx$values
@@ -138,8 +138,12 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
     #if(fnorm(B0) > 0) delta = fnorm(B - B0)^2 / fnorm(B0)^2
     if(verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
   }
-  if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
-  else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
+
+  if (verbose){
+    if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
+    else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
+  }
+
   
   # Step 2: map back
   
@@ -182,8 +186,8 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
 
 
 ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NULL,
-                               Sy = NULL, Sxy = NULL, standardize = T, 
-                               rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = T){
+                               Sy = NULL, Sxy = NULL, standardize = TRUE, 
+                               rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = TRUE){
   
   p = ncol(X)
   q = ncol(Y)
@@ -207,8 +211,8 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
   else B = B0
   
   
-  EDx = eigen(Sx, symmetric = T)
-  EDy = eigen(Sy, symmetric = T)
+  EDx = eigen(Sx, symmetric = TRUE)
+  EDy = eigen(Sy, symmetric = TRUE)
   
   Ux = EDx$vectors
   Lx = EDx$values
@@ -285,18 +289,16 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
       }
       if(verbose && iter %% 10 == 0) cat("\niter:", iter,  "delta:", delta)
     }
-    if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
-    else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
+    if (verbose){
+      if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
+      else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
+    }
     
     # Step 2: map back
     
     B = Z
     C = matmul(matmul(Sx12, B), Sy12) 
     
-    # SVD = svd(C)
-    # U0 = SVD$u[, 1:r, drop = F]
-    # V0 = SVD$v[, 1:r, drop = F]
-    # L0 = SVD$d[1:r]
     
     SVD = RSpectra::svds(C, r)
     U0 = SVD$u
@@ -321,9 +323,9 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
 
 
 ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2, 
-                     standardize = T, Sx = NULL, Sy = NULL, Sxy = NULL,
+                     standardize = TRUE, Sx = NULL, Sy = NULL, Sxy = NULL,
                      rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
-                     maxiter = 500, verbose = T, parallel = T,
+                     maxiter = 500, verbose = TRUE, parallel = TRUE,
                      nb_cores = NULL, set_seed_cv=NULL, scoring_method = "mse",
                      cv_use_median = FALSE){
   p = ncol(X)
@@ -357,7 +359,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
    
 
     
-    folds = caret::createFolds(1:n, k = nfold, list = T)
+    folds = caret::createFolds(1:n, k = nfold, list = TRUE)
     n_success = nfold
     ## Choose penalty lambda
     results <- data.frame(lambda = numeric(), mse = numeric(), se = numeric())
@@ -377,7 +379,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
       
       if (!is.null(cl)) {
         # If the cluster was created successfully, register it and plan to stop it
-        cat(crayon::green("Parallel backend successfully registered.\n"))
+        if(verbose) { cat(crayon::green("Parallel backend successfully registered.\n"))}
         doParallel::registerDoParallel(cl)
         on.exit(parallel::stopCluster(cl), add = TRUE)
       } else {
@@ -410,9 +412,9 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                      Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
                      
                      ## Fit lasso model
-                     ECCA = ecca_across_lambdas(X[-fold,,drop = F], Y[-fold,,drop = F], 
+                     ECCA = ecca_across_lambdas(X[-fold,,drop = FALSE], Y[-fold,,drop = FALSE], 
                                                 Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
-                                                standardize = F,
+                                                standardize = FALSE,
                                                 lambdas=lambdas, groups=groups, r=r, rho=rho, 
                                                 B0=B0, eps=eps, maxiter=maxiter, verbose = verbose)
                      
@@ -493,9 +495,9 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
           Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
           
           ## Fit lasso model
-          ECCA = ecca_across_lambdas(X[-fold,,drop = F], Y[-fold,,drop = F], 
+          ECCA = ecca_across_lambdas(X[-fold,,drop = FALSE], Y[-fold,,drop = FALSE], 
                                      Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
-                                     standardize = F,
+                                     standardize = FALSE,
                                      lambdas = lambdas, groups = groups, r = r, 
                                      rho = rho, B0 = B0, eps= eps, maxiter = maxiter, verbose = verbose)
           
@@ -611,9 +613,9 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
 #'   \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
 #' }
 #' @export
-ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
+ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = FALSE,
                    rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
-                   verbose = F, parallel = F,
+                   verbose = FALSE, parallel = FALSE,
                    nb_cores = NULL,
                    set_seed_cv=NULL, scoring_method = "mse", cv_use_median = FALSE){
   p = ncol(X)
@@ -628,7 +630,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
   # Select lambda
   if(length(lambdas) > 1){
     eval = ecca.eval(X, Y, lambdas=lambdas, groups=groups, r=r, rho=rho,
-                     standardize = F,
+                     standardize = FALSE,
                      B0 = B0, nfold=nfold, eps=eps,  maxiter=maxiter, verbose=verbose, parallel= parallel,
                      nb_cores = nb_cores, set_seed_cv=set_seed_cv, scoring_method = scoring_method, cv_use_median = cv_use_median)
     if(select == "lambda.1se") lambda.opt = eval$lambda.1se
@@ -636,7 +638,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = F,
   } else {
     lambda.opt = lambdas
   }
-  cat("\n\nselected lambda:", lambda.opt)
+  if (verbose) { cat("\n\nselected lambda:", lambda.opt)}
   
   # Fit lasso
   ECCA = ecca(X, Y, lambda=lambda.opt, groups = groups, r=r, rho=rho, B0=B0, eps=eps, 

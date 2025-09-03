@@ -33,7 +33,7 @@ gca_to_cca <-
 #' @param num_cores The number of cores to use. If NULL, it's determined automatically.
 #' @return A cluster object `cl` on success, or `NULL` on failure.
 
-setup_parallel_backend <- function(num_cores = NULL) {
+setup_parallel_backend <- function(num_cores = NULL, verbose = FALSE) {
 
   # 1. Determine the number of cores to use
   if (is.null(num_cores)) {
@@ -43,8 +43,10 @@ setup_parallel_backend <- function(num_cores = NULL) {
   }
   # Ensure we have at least 1 core
   num_cores <- max(1, num_cores)
-
-  cat(paste("\nAttempting to set up parallel backend with", num_cores, "cores.\n"))
+  if (verbose){
+     cat(paste("\nAttempting to set up parallel backend with", num_cores, "cores.\n"))
+  }
+  
   
   cl <- NULL
   
@@ -52,17 +54,23 @@ setup_parallel_backend <- function(num_cores = NULL) {
   tryCatch({
     # The preferred method for Unix/macOS/Linux is FORK
     if (.Platform$OS.type == "unix") {
-      cat("Unix-like system detected. Trying FORK backend (most efficient)...\n")
+      if (verbose){
+        cat("Unix-like system detected. Trying FORK backend (most efficient)...\n")
+      }
       cl <- parallel::makeCluster(num_cores, type = "FORK")
     } else {
       # The only method for Windows is PSOCK
-      cat("Windows system detected. Trying PSOCK backend...\n")
+      if (verbose){
+          cat("Windows system detected. Trying PSOCK backend...\n")
+      }
       cl <- parallel::makeCluster(num_cores, type = "PSOCK")
     }
   }, error = function(e_fork) {
     # This block runs if the first attempt (e.g., FORK) failed
-    cat(crayon::yellow("Initial backend setup failed with error: ", e_fork$message, "\n"))
-    cat("Attempting fallback PSOCK backend...\n")
+ 
+      cat(crayon::yellow("Initial backend setup failed with error: ", e_fork$message, "\n"))
+      cat("Attempting fallback PSOCK backend...\n")
+    
     
     # Second attempt: Try PSOCK, which works everywhere but may be blocked
     tryCatch({

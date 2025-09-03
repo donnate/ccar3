@@ -5,7 +5,7 @@
 #'
 #' @param g igraph graph object.
 #' @param weight edge weights.
-#' 
+#' @return Edge incidence matrix of the graph g, with +weight for the source node and -weight for the target node.
 #' @export
 get_edge_incidence <- function(g, weight = 1){
   n_nodes = igraph::vcount(g)

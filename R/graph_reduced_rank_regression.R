@@ -135,7 +135,8 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
       
       if (!is.null(cl)) {
         # If the cluster was created successfully, register it and plan to stop it
-        cat(crayon::green("Parallel backend successfully registered.\n"))
+        if (verbose)  { cat(crayon::green("Parallel backend successfully registered.\n")) }
+
         doParallel::registerDoParallel(cl)
         on.exit(parallel::stopCluster(cl), add = TRUE)
       } else {
