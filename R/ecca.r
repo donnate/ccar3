@@ -332,7 +332,9 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
   q = ncol(Y)
   n = nrow(X)
   if (n < 2 * nfold) {
-    cat(crayon::yellow(paste0("\nWarning: Sample size (n=", n, ") is too small for ", nfold, "-fold CV. Skipping CV and fitting with the first lambda value.")))
+    if (verbose){
+      cat(crayon::yellow(paste0("\nWarning: Sample size (n=", n, ") is too small for ", nfold, "-fold CV. Skipping CV and fitting with the first lambda value.")))
+    }
     lambda.min = lambdas[1]
     lambda.1se =lambdas[1]
     scores = NULL
