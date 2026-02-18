@@ -155,10 +155,10 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   # V0 = SVD$v[, 1:r, drop = F]
   # L0 = SVD$d[1:r]
 
-    if (requireNamespace("RSpectra", quietly = TRUE)) {
-    SVD <- RSpectra::svds(C, r)
+  if (requireNamespace("RSpectra", quietly = TRUE)) {
+    SVD <- RSpectra::svds(B, r)
   } else {
-    SVD <- svd(C, nu=r, nv=r)
+    SVD <- svd(B, nu=r, nv=r)
   }
 
 
@@ -169,13 +169,15 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
   
   if(max(L0) > 1e-8){
-    U = matmul(matmul(matmul(B, Sy12),V0), diag(inv_L0, nrow = length(L0)))
-    V = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
-    return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = diag(matmul(t(U), matmul(Sxy, V)))))
+    
+    U = U0 %*% sqrtm(  matmul(matmul( t(U0)  ,Sx) ,U0) )$Binv 
+    V = V0 %*% sqrtm(  matmul(matmul( t(V0)  ,Sy) ,V0)  )$Binv
+    
+    return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = diag(matmul(t(U), matmul(Sxy, V))), C = C ) )
   } else{
     U = matrix(NA, p, r)
     V = matrix(NA, q, r)
-    return(list(U = U, V = V, loss = Inf, cor = rep(0, r)))
+    return(list(U = U, V = V, loss = Inf, cor = rep(0, r), C = C))
   }
   
   
@@ -306,11 +308,11 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
     L0 = SVD$d
     
     
-    inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
+
     
     if(max(L0) > 1e-8){
-      U[[i]] = matmul(matmul(matmul(B, Sy12),V0), diag(inv_L0, nrow = length(L0)))
-      V[[i]] = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
+      U[[i]] = U0 %*% sqrtm(  matmul(matmul( t(U0)  ,Sx) ,U0) )$Binv 
+      V[[i]] = V0 %*% sqrtm(  matmul(matmul( t(V0)  ,Sy) ,V0) )$Binv
     } else{
       U[[i]] = matrix(NA, p, r)
       V[[i]] = matrix(NA, q, r)
@@ -657,6 +659,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = FALSE,
   
   return(list(U = ECCA$U, 
               V = ECCA$V, 
+              C = ECCA$C,
               cor = fit_cor, 
               loss = fit_loss,
               lambda.opt  = lambda.opt,
