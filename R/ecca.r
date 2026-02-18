@@ -60,10 +60,10 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   EDx = eigen(Sx, symmetric = TRUE)
   EDy = eigen(Sy, symmetric = TRUE)
   
-  Ux = EDx$vectors
-  Lx = EDx$values
-  Uy = EDy$vectors
-  Ly = EDy$values
+  Ux = EDx$vectors[, 1: min(n, p)]
+  Lx = EDx$values[1:min(n, p)]
+  Uy = EDy$vectors[, 1: min(n, q)]
+  Ly = EDy$values[1: min(n, q)]
   
   Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux)) 
   Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy)) 
@@ -87,9 +87,11 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
     # Update B
     
     B0 = B
-    Btilde = B1 + rho * (t(Ux) %*% ( Z - H) %*% Uy) 
+    proj = (t(Ux) %*% ( Z - H) %*% Uy) 
+    Btilde = B1 + rho * proj
     Btilde = Btilde / b
-    B = ((Ux %*% Btilde) %*% t(Uy))
+    B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
+    
     
     # Update Z
     
@@ -216,10 +218,10 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
   EDx = eigen(Sx, symmetric = TRUE)
   EDy = eigen(Sy, symmetric = TRUE)
   
-  Ux = EDx$vectors
-  Lx = EDx$values
-  Uy = EDy$vectors
-  Ly = EDy$values
+  Ux = EDx$vectors[, 1: min(n, p)]
+  Lx = EDx$values[1:min(n, p)]
+  Uy = EDy$vectors[, 1: min(n, q)]
+  Ly = EDy$values[1: min(n, q)]
   
   Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux)) 
   Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy)) 
@@ -245,9 +247,10 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
       # Update B
       
       B0 = B
-      Btilde = B1 + rho * (t(Ux) %*% ( Z - H) %*%  Uy) 
+      proj = (t(Ux) %*% ( Z - H) %*% Uy) 
+      Btilde = B1 + rho * proj
       Btilde = Btilde / b
-      B = (Ux %*% Btilde) %*% t(Uy)
+      B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
       
       # Update Z
       
