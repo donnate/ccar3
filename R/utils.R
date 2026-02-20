@@ -24,7 +24,7 @@ gca_to_cca <-
   }
 
 
-  #' Set up a parallel backend with graceful fallbacks.
+#' Set up a parallel backend with graceful fallbacks.
 #'
 #' Attempts to create a parallel cluster, first trying the efficient FORK
 #' method (on Unix-like systems), then falling back to PSOCK, and finally

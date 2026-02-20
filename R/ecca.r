@@ -186,8 +186,9 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
 
 
 ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NULL,
-                               Sy = NULL, Sxy = NULL, standardize = TRUE, 
-                               rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = TRUE){
+                               Sy = NULL, Sxy = NULL, standardize = TRUE,
+                               rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = TRUE,
+                               dense = TRUE, optimized = FALSE){
   
   p = ncol(X)
   q = ncol(Y)
@@ -198,126 +199,192 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
     X = scale(X)
     Y = scale(Y)
   } 
-  
-  
-  
-  if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
-  if (is.null(Sx)) Sx = matmul(t(X), X) / n
-  if (is.null(Sy)) {
-    Sy = matmul(t(Y), Y) / n
-  }
-  
-  if(is.null(B0)) B = matrix(0, p, q)
-  else B = B0
-  
-  
-  EDx = eigen(Sx, symmetric = TRUE)
-  EDy = eigen(Sy, symmetric = TRUE)
-  
-  Ux = EDx$vectors
-  Lx = EDx$values
-  Uy = EDy$vectors
-  Ly = EDy$values
-  
-  Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux)) 
-  Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy)) 
-  
-  b = outer(Lx, Ly) + rho
-  B1 = matmul(matmul(t(Ux), Sxy),  Uy)
-  U = list()
-  V = list()
-  H = matrix(0, p, q)
-  
-  for(i in 1:length(lambdas)) {
-    lambda = lambdas[[i]]
-    
-    # Step 1: ADMM
-    
-    Z = B
-    iter = 0
-    delta = Inf
-    
-    while(delta > eps && iter < maxiter){
-      iter = iter + 1
-      
-      # Update B
-      
-      B0 = B
-      Btilde = B1 + rho * (t(Ux) %*% ( Z - H) %*%  Uy) 
-      Btilde = Btilde / b
-      B = (Ux %*% Btilde) %*% t(Uy)
-      
-      # Update Z
-      
-      Z = B + H
-      if(is.null(groups)){
-        Z = soft_thresh(Z, lambda / rho)
-      }
-      else{
-        for (g in seq_along(groups)) {
-  
-          # Get the indices for the current group
-          current_indices <- groups[[g]]
-          
-          # 1. Subset Z only ONCE
-          Z_subset <- Z[current_indices]
-          
-          # 2. Calculate the correctly scaled lambda for this group
-          #    Using nrow() is correct for your 2-column coordinate matrix
-          lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
-          
-          # 3. Apply the single, robust thresholding function
-          thresholded_values <- soft_thresh2(Z_subset, lambda_g)
-          
-          # 4. Assign the result back
-          Z[current_indices] <- thresholded_values
+  if (dense) {
+    if (is.null(Sxy)) Sxy = matmul(t(X), Y) / n
+    if (is.null(Sx)) Sx = matmul(t(X), X) / n
+    if (is.null(Sy)) Sy = matmul(t(Y), Y) / n
+
+    if (is.null(B0)) B = matrix(0, p, q) else B = B0
+
+    EDx = eigen(Sx, symmetric = TRUE)
+    EDy = eigen(Sy, symmetric = TRUE)
+
+    Ux = EDx$vectors
+    Lx = EDx$values
+    Uy = EDy$vectors
+    Ly = EDy$values
+
+    Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux))
+    Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy))
+
+    b = outer(Lx, Ly) + rho
+    B1 = matmul(matmul(t(Ux), Sxy),  Uy)
+    U = list()
+    V = list()
+    H = matrix(0, p, q)
+
+    for (i in 1:length(lambdas)) {
+      lambda = lambdas[[i]]
+
+      Z = B
+      iter = 0
+      delta = Inf
+
+      while (delta > eps && iter < maxiter) {
+        iter = iter + 1
+
+        B0 = B
+        Btilde = B1 + rho * (t(Ux) %*% (Z - H) %*% Uy)
+        Btilde = Btilde / b
+        B = (Ux %*% Btilde) %*% t(Uy)
+
+        Z = B + H
+        if (is.null(groups)) {
+          Z = soft_thresh(Z, lambda / rho)
+        } else {
+          for (g in seq_along(groups)) {
+            current_indices <- groups[[g]]
+            Z_subset <- Z[current_indices]
+            lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
+            thresholded_values <- soft_thresh2(Z_subset, lambda_g)
+            Z[current_indices] <- thresholded_values
+          }
         }
 
-        # for (g in 1:length(groups)){
-        #   Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
-        # }
+        H = H + rho * (B - Z)
+        sB0 <- sum(B0^2)
+        if (sB0 > 1e-20) {
+          delta <- sum((B - B0)^2) / sB0
+        } else {
+          delta <- Inf
+        }
+        if (verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
       }
-      
-      # Update H
-      
-      H = H + rho * (B - Z)
-      sB0 <- sum(B0^2) 
-      if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
-        delta <- sum((B - B0)^2) / sB0
+      if (verbose) {
+        if (iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
+        else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
+      }
+
+      B = Z
+      C = matmul(matmul(Sx12, B), Sy12)
+      SVD = RSpectra::svds(C, r)
+      U0 = SVD$u
+      V0 = SVD$v
+      L0 = SVD$d
+      inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
+
+      if (max(L0) > 1e-8) {
+        U[[i]] = matmul(matmul(matmul(B, Sy12), V0), diag(inv_L0, nrow = length(L0)))
+        V[[i]] = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
       } else {
-        delta <- Inf
+        U[[i]] = matrix(NA, p, r)
+        V[[i]] = matrix(NA, q, r)
       }
-      if(verbose && iter %% 10 == 0) cat("\niter:", iter,  "delta:", delta)
     }
-    if (verbose){
-      if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
-      else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
-    }
-    
-    # Step 2: map back
-    
-    B = Z
-    C = matmul(matmul(Sx12, B), Sy12) 
-    
-    
-    SVD = RSpectra::svds(C, r)
-    U0 = SVD$u
-    V0 = SVD$v
-    L0 = SVD$d
-    
-    
-    inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
-    
-    if(max(L0) > 1e-8){
-      U[[i]] = matmul(matmul(matmul(B, Sy12),V0), diag(inv_L0, nrow = length(L0)))
-      V[[i]] = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
-    } else{
+
+    if (length(lambdas) == 1) return(list(U = U[[1]], V = V[[1]]))
+    return(list(U = U, V = V))
+  } else if (optimized) {
+    if (is.null(Sxy)) Sxy = matmul(t(X), Y) / n
+    if (is.null(B0)) B = matrix(0, p, q) else B = B0
+
+    svd_x = svd(X / sqrt(n), nu = 0, nv = min(n, p))
+    svd_y = svd(Y / sqrt(n), nu = 0, nv = min(n, q))
+
+    Lx = pmax(svd_x$d^2, 0)
+    Ly = pmax(svd_y$d^2, 0)
+    keep_x = Lx > 1e-10
+    keep_y = Ly > 1e-10
+    Lx = Lx[keep_x]
+    Ly = Ly[keep_y]
+    Ux = svd_x$v[, keep_x, drop = FALSE]
+    Uy = svd_y$v[, keep_y, drop = FALSE]
+
+    U = list()
+    V = list()
+    H = matrix(0, p, q)
+
+    for (i in 1:length(lambdas)) {
+      lambda = lambdas[[i]]
+      Z = B
+      iter = 0
+      delta = Inf
+
+      while (delta > eps && iter < maxiter) {
+        iter = iter + 1
+        B0 = B
+
+        M = Sxy + rho * (Z - H)
+        if (length(Lx) > 0 && length(Ly) > 0) {
+          A = matmul(matmul(t(Ux), M), Uy)
+          correction_scale = 1 / (outer(Lx, Ly) + rho) - 1 / rho
+          B = M / rho + matmul(matmul(Ux, A * correction_scale), t(Uy))
+        } else {
+          B = M / rho
+        }
+
+        Z = B + H
+        if (is.null(groups)) {
+          Z = soft_thresh(Z, lambda / rho)
+        } else {
+          for (g in seq_along(groups)) {
+            current_indices <- groups[[g]]
+            Z_subset <- Z[current_indices]
+            lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
+            thresholded_values <- soft_thresh2(Z_subset, lambda_g)
+            Z[current_indices] <- thresholded_values
+          }
+        }
+
+        H = H + rho * (B - Z)
+        sB0 <- sum(B0^2)
+        if (sB0 > 1e-20) {
+          delta <- sum((B - B0)^2) / sB0
+        } else {
+          delta <- Inf
+        }
+        if (verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
+      }
+      if (verbose) {
+        if (iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
+        else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
+      }
+
+      B = Z
       U[[i]] = matrix(NA, p, r)
       V[[i]] = matrix(NA, q, r)
+
+      if (length(Lx) == 0 || length(Ly) == 0) next
+
+      Btilde = matmul(matmul(t(Ux), B), Uy)
+      Csmall = Btilde * Lx
+      Csmall = t(t(Csmall) * Ly)
+      r_eff = min(r, nrow(Csmall), ncol(Csmall))
+      if (r_eff < 1) next
+
+      if (requireNamespace("RSpectra", quietly = TRUE) && r_eff < min(dim(Csmall))) {
+        SVD = RSpectra::svds(Csmall, r_eff)
+      } else {
+        SVD = svd(Csmall, nu = r_eff, nv = r_eff)
+      }
+
+      L0 = SVD$d
+      if (length(L0) == 0 || max(L0) <= 1e-8) next
+
+      inv_L0 = sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
+      termY = matmul(Uy * rep(Ly, each = q), SVD$v)
+      termX = matmul(Ux * rep(Lx, each = p), SVD$u)
+      Ui = matmul(matmul(B, termY), diag(inv_L0, nrow = length(inv_L0)))
+      Vi = matmul(matmul(t(B), termX), diag(inv_L0, nrow = length(inv_L0)))
+      U[[i]][, 1:r_eff] = Ui
+      V[[i]][, 1:r_eff] = Vi
     }
+
+    if (length(lambdas) == 1) return(list(U = U[[1]], V = V[[1]]))
+    return(list(U = U, V = V))
   }
-  if(length(lambdas) == 1) return(list(U = U[[1]], V = V[[1]]))
-  else return(list(U = U, V = V))
+
+  stop("Set either dense=TRUE or optimized=TRUE.")
 }
 
 
@@ -327,7 +394,7 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                      rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
                      maxiter = 500, verbose = TRUE, parallel = TRUE,
                      nb_cores = NULL, set_seed_cv=NULL, scoring_method = "mse",
-                     cv_use_median = FALSE){
+                     cv_use_median = FALSE, dense = TRUE, optimized = FALSE){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -418,7 +485,8 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                                                 Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
                                                 standardize = FALSE,
                                                 lambdas=lambdas, groups=groups, r=r, rho=rho, 
-                                                B0=B0, eps=eps, maxiter=maxiter, verbose = verbose)
+                                                B0=B0, eps=eps, maxiter=maxiter, verbose = verbose,
+                                                dense = dense, optimized = optimized)
                      
                      ## Evaluate on test set
                      scores = rep(0, length(lambdas))
@@ -501,7 +569,8 @@ ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2,
                                      Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
                                      standardize = FALSE,
                                      lambdas = lambdas, groups = groups, r = r, 
-                                     rho = rho, B0 = B0, eps= eps, maxiter = maxiter, verbose = verbose)
+                                     rho = rho, B0 = B0, eps= eps, maxiter = maxiter, verbose = verbose,
+                                     dense = dense, optimized = optimized)
           
           ## Evaluate on test set
           scores = rep(0, length(lambdas))
@@ -619,7 +688,8 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = FALSE,
                    rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
                    verbose = FALSE, parallel = FALSE,
                    nb_cores = NULL,
-                   set_seed_cv=NULL, scoring_method = "mse", cv_use_median = FALSE){
+                   set_seed_cv=NULL, scoring_method = "mse", cv_use_median = FALSE,
+                   dense = TRUE, optimized = FALSE){
   p = ncol(X)
   q = ncol(Y)
   n = nrow(X)
@@ -634,7 +704,8 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = FALSE,
     eval = ecca.eval(X, Y, lambdas=lambdas, groups=groups, r=r, rho=rho,
                      standardize = FALSE,
                      B0 = B0, nfold=nfold, eps=eps,  maxiter=maxiter, verbose=verbose, parallel= parallel,
-                     nb_cores = nb_cores, set_seed_cv=set_seed_cv, scoring_method = scoring_method, cv_use_median = cv_use_median)
+                     nb_cores = nb_cores, set_seed_cv=set_seed_cv, scoring_method = scoring_method, cv_use_median = cv_use_median,
+                     dense = dense, optimized = optimized)
     if(select == "lambda.1se") lambda.opt = eval$lambda.1se
     else lambda.opt = eval$lambda.min
   } else {
