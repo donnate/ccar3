@@ -76,26 +76,36 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   
   
   # Step 1: ADMM
-  H = matrix(0, p, q)
-  Z = B
+  
+  
+  Ztilde =  matrix(0,  min(n, p),  min(n, q))
+  Htilde = matrix(0,  min(n, p),  min(n, q))
+  Btilde = 0
   iter = 0
   delta = Inf
   
   while(delta > eps && iter < maxiter){
     iter = iter + 1
     
+    Btilde0 = Btilde 
     # Update B
+    #proj = (t(Ux) %*% ( Z - H) %*% Uy) 
+    proj = Ztilde - Htilde
     
-    B0 = B
-    proj = (t(Ux) %*% ( Z - H) %*% Uy) 
     Btilde = B1 + rho * proj
     Btilde = Btilde / b
-    B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
-    
+    #B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
     
     # Update Z
     
-    Z = B + H
+    #Z = B + H
+    if(iter == 1){
+      Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy))
+    } else{
+      Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z
+    }
+    
+    
     if(is.null(groups)){
       Z = soft_thresh(Z, lambda / rho)
     }
@@ -127,11 +137,13 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
     
     # Update H
     
-    H = H + rho * (B - Z)
+    #H = H + rho * (B - Z)
+    Ztilde =  t(Ux) %*% Z %*% (Uy) 
+    Htilde = Htilde + rho * (Btilde- Ztilde )
     
-    sB0 <- sum(B0^2)
+    sB0 <- sum(Btilde0^2)
     if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
-      delta <- sum((B - B0)^2) / sB0
+      delta <- sum((Btilde - Btilde0)^2) / sB0
     } else {
       delta <- Inf
     }
@@ -146,7 +158,6 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
     else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
   }
 
-  
   # Step 2: map back
   
   B = Z
@@ -205,6 +216,13 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
   
   
   
+  
+  
+  
+  
+  
+  ### This can be improved for memory concern
+  
   if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
   if (is.null(Sx)) Sx = matmul(t(X), X) / n
   if (is.null(Sy)) {
@@ -230,37 +248,53 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
   B1 = matmul(matmul(t(Ux), Sxy),  Uy)
   U = list()
   V = list()
-  H = matrix(0, p, q)
+  
+  
+  
+  
+  
+
+
   
   for(i in 1:length(lambdas)) {
     lambda = lambdas[[i]]
     
     # Step 1: ADMM
     
-    Z = B
+    Ztilde =  matrix(0,  min(n, p),  min(n, q))
+    Htilde = matrix(0,  min(n, p),  min(n, q))
+    Btilde = 0
     iter = 0
     delta = Inf
     
     while(delta > eps && iter < maxiter){
       iter = iter + 1
       
+      Btilde0 = Btilde 
       # Update B
+      #proj = (t(Ux) %*% ( Z - H) %*% Uy) 
+      proj = Ztilde - Htilde
       
-      B0 = B
-      proj = (t(Ux) %*% ( Z - H) %*% Uy) 
       Btilde = B1 + rho * proj
       Btilde = Btilde / b
-      B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
+      #B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
       
       # Update Z
       
-      Z = B + H
+      #Z = B + H
+      if(iter == 1){
+        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy))
+      } else{
+        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z
+      }
+      
+      
       if(is.null(groups)){
         Z = soft_thresh(Z, lambda / rho)
       }
       else{
         for (g in seq_along(groups)) {
-  
+          
           # Get the indices for the current group
           current_indices <- groups[[g]]
           
@@ -277,7 +311,8 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
           # 4. Assign the result back
           Z[current_indices] <- thresholded_values
         }
-
+        
+        
         # for (g in 1:length(groups)){
         #   Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
         # }
@@ -285,13 +320,17 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
       
       # Update H
       
-      H = H + rho * (B - Z)
-      sB0 <- sum(B0^2) 
+      #H = H + rho * (B - Z)
+      Ztilde =  t(Ux) %*% Z %*% (Uy) 
+      Htilde = Htilde + rho * (Btilde- Ztilde )
+      
+      sB0 <- sum(Btilde0^2)
       if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
-        delta <- sum((B - B0)^2) / sB0
+        delta <- sum((Btilde - Btilde0)^2) / sB0
       } else {
         delta <- Inf
       }
+      
       if(verbose && iter %% 10 == 0) cat("\niter:", iter,  "delta:", delta)
     }
     if (verbose){
@@ -309,7 +348,6 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
     U0 = SVD$u
     V0 = SVD$v
     L0 = SVD$d
-    
     
 
     
