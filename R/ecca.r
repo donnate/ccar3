@@ -43,141 +43,160 @@ ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
   n = nrow(X)
   ##### Need to make sure that they are centered
   if (standardize) {
-    X = scale(X)
-    Y = scale(Y)
+    X = scale(X, center = TRUE, scale = TRUE)
+    Y = scale(Y, center = TRUE, scale = TRUE)
   } 
-  
-  if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
-  if (is.null(Sx)) Sx = matmul(t(X), X) / n
-  if (is.null(Sy)) {
-    Sy = matmul(t(Y), Y) / n
-  }
-  
-  if(is.null(B0)) B = matrix(0, p, q)
-  else B = B0
-  
-  
-  EDx = eigen(Sx, symmetric = TRUE)
-  EDy = eigen(Sy, symmetric = TRUE)
-  
-  Ux = EDx$vectors
-  Lx = EDx$values
-  Uy = EDy$vectors
-  Ly = EDy$values
-  
-  Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux)) 
-  Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy)) 
-  
-  b = outer(Lx, Ly) + rho
-  B1 = matmul(matmul(t(Ux), Sxy),  Uy)
-  U = list()
-  V = list()
-  
-  
-  
-  # Step 1: ADMM
-  H = matrix(0, p, q)
-  Z = B
-  iter = 0
-  delta = Inf
-  
-  while(delta > eps && iter < maxiter){
-    iter = iter + 1
-    
-    # Update B
-    
-    B0 = B
-    Btilde = B1 + rho * (t(Ux) %*% ( Z - H) %*% Uy) 
-    Btilde = Btilde / b
-    B = ((Ux %*% Btilde) %*% t(Uy))
-    
-    # Update Z
-    
-    Z = B + H
-    if(is.null(groups)){
-      Z = soft_thresh(Z, lambda / rho)
+
+  if (max(p,q)<n){
+      if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
+    if (is.null(Sx)) Sx = matmul(t(X), X) / n
+    if (is.null(Sy)) {
+      Sy = matmul(t(Y), Y) / n
     }
-    else{
-      for (g in seq_along(groups)) {
-  
-        # Get the indices for the current group
-        current_indices <- groups[[g]]
-        
-        # 1. Subset Z only ONCE
-        Z_subset <- Z[current_indices]
-        
-        # 2. Calculate the correctly scaled lambda for this group
-        #    Using nrow() is correct for your 2-column coordinate matrix
-        lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
-        
-        # 3. Apply the single, robust thresholding function
-        thresholded_values <- soft_thresh2(Z_subset, lambda_g)
-        
-        # 4. Assign the result back
-        Z[current_indices] <- thresholded_values
+    
+    if(is.null(B0)) B = matrix(0, p, q)
+    else B = B0
+    
+    
+    EDx = eigen(Sx, symmetric = TRUE)
+    EDy = eigen(Sy, symmetric = TRUE)
+    
+    Ux = EDx$vectors[, 1: min(n, p)]
+    Lx = EDx$values[1:min(n, p)]
+    Uy = EDy$vectors[, 1: min(n, q)]
+    Ly = EDy$values[1: min(n, q)]
+    
+    Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux)) 
+    Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy)) 
+    
+    b = outer(Lx, Ly) + rho
+    B1 = matmul(matmul(t(Ux), Sxy),  Uy)
+    U = list()
+    V = list()
+    
+    
+    
+    # Step 1: ADMM
+    
+    
+    Ztilde =  matrix(0,  min(n, p),  min(n, q))
+    Htilde = matrix(0,  min(n, p),  min(n, q))
+    Btilde = 0
+    iter = 0
+    delta = Inf
+    
+    while(delta > eps && iter < maxiter){
+      iter = iter + 1
+      
+      Btilde0 = Btilde 
+      # Update B
+      #proj = (t(Ux) %*% ( Z - H) %*% Uy) 
+      proj = Ztilde - Htilde
+      
+      Btilde = B1 + rho * proj
+      Btilde = Btilde / b
+      #B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
+      
+      # Update Z
+      
+      #Z = B + H
+      if(iter == 1){
+        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy))
+      } else{
+        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z
       }
+      
+      
+      if(is.null(groups)){
+        Z = soft_thresh(Z, lambda / rho)
+      }
+      else{
+        for (g in seq_along(groups)) {
+    
+          # Get the indices for the current group
+          current_indices <- groups[[g]]
+          
+          # 1. Subset Z only ONCE
+          Z_subset <- Z[current_indices]
+          
+          # 2. Calculate the correctly scaled lambda for this group
+          #    Using nrow() is correct for your 2-column coordinate matrix
+          lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
+          
+          # 3. Apply the single, robust thresholding function
+          thresholded_values <- soft_thresh2(Z_subset, lambda_g)
+          
+          # 4. Assign the result back
+          Z[current_indices] <- thresholded_values
+        }
 
 
-      # for (g in 1:length(groups)){
-      #   Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
-      # }
+        # for (g in 1:length(groups)){
+        #   Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
+        # }
+      }
+      
+      # Update H
+      
+      #H = H + rho * (B - Z)
+      Ztilde =  t(Ux) %*% Z %*% (Uy) 
+      Htilde = Htilde + rho * (Btilde- Ztilde )
+      
+      sB0 <- sum(Btilde0^2)
+      if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
+        delta <- sum((Btilde - Btilde0)^2) / sB0
+      } else {
+        delta <- Inf
+      }
+      
+      
+      #if(fnorm(B0) > 0) delta = fnorm(B - B0)^2 / fnorm(B0)^2
+      if(verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
     }
-    
-    # Update H
-    
-    H = H + rho * (B - Z)
-    
-    sB0 <- sum(B0^2)
-    if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
-      delta <- sum((B - B0)^2) / sB0
-    } else {
-      delta <- Inf
+
+    if (verbose){
+      if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
+      else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
     }
-    
-    
-    #if(fnorm(B0) > 0) delta = fnorm(B - B0)^2 / fnorm(B0)^2
-    if(verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
-  }
 
-  if (verbose){
-    if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
-    else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
-  }
-
-  
-  # Step 2: map back
-  
-  B = Z
-  C = matmul(matmul(Sx12, B), Sy12) 
-  
-  # SVD = svd(C)
-  # U0 = SVD$u[, 1:r, drop = F]
-  # V0 = SVD$v[, 1:r, drop = F]
-  # L0 = SVD$d[1:r]
+    # Step 2: map back
+    
+    B = Z
+    C = matmul(matmul(Sx12, B), Sy12) 
+    
+    # SVD = svd(C)
+    # U0 = SVD$u[, 1:r, drop = F]
+    # V0 = SVD$v[, 1:r, drop = F]
+    # L0 = SVD$d[1:r]
 
     if (requireNamespace("RSpectra", quietly = TRUE)) {
-    SVD <- RSpectra::svds(C, r)
-  } else {
-    SVD <- svd(C, nu=r, nv=r)
-  }
+      SVD <- RSpectra::svds(B, r)
+    } else {
+      SVD <- svd(B, nu=r, nv=r)
+    }
 
 
-  U0 = SVD$u
-  V0 = SVD$v
-  L0 = SVD$d
+    U0 = SVD$u
+    V0 = SVD$v
+    L0 = SVD$d
+    
+    inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
+    
+    if(max(L0) > 1e-8){
+      
+      U = U0 %*% pracma::sqrtm(  matmul(matmul( t(U0)  ,Sx) ,U0) )$Binv 
+      V = V0 %*% pracma::sqrtm(  matmul(matmul( t(V0)  ,Sy) ,V0)  )$Binv
+      
+      return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = diag(matmul(t(U), matmul(Sxy, V))), C = C ) )
+    } else{
+      U = matrix(NA, p, r)
+      V = matrix(NA, q, r)
+      return(list(U = U, V = V, loss = Inf, cor = rep(0, r), C = C))
+    }
   
-  inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
-  
-  if(max(L0) > 1e-8){
-    U = matmul(matmul(matmul(B, Sy12),V0), diag(inv_L0, nrow = length(L0)))
-    V = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
-    return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = diag(matmul(t(U), matmul(Sxy, V)))))
-  } else{
-    U = matrix(NA, p, r)
-    V = matrix(NA, q, r)
-    return(list(U = U, V = V, loss = Inf, cor = rep(0, r)))
   }
   
+
   
 }
 
@@ -199,158 +218,141 @@ ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NU
     X = scale(X)
     Y = scale(Y)
   } 
-  if (dense) {
-    if (is.null(Sxy)) Sxy = matmul(t(X), Y) / n
-    if (is.null(Sx)) Sx = matmul(t(X), X) / n
-    if (is.null(Sy)) Sy = matmul(t(Y), Y) / n
+  
+  ### This can be improved for memory concern
+  
+  if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
+  if (is.null(Sx)) Sx = matmul(t(X), X) / n
+  if (is.null(Sy)) {
+    Sy = matmul(t(Y), Y) / n
+  }
+  
+  if(is.null(B0)) B = matrix(0, p, q)
+  else B = B0
+  
+  
+  EDx = eigen(Sx, symmetric = TRUE)
+  EDy = eigen(Sy, symmetric = TRUE)
+  
+  Ux = EDx$vectors[, 1: min(n, p)]
+  Lx = EDx$values[1:min(n, p)]
+  Uy = EDy$vectors[, 1: min(n, q)]
+  Ly = EDy$values[1: min(n, q)]
+  
+  Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux)) 
+  Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy)) 
+  
+  b = outer(Lx, Ly) + rho
+  B1 = matmul(matmul(t(Ux), Sxy),  Uy)
+  U = list()
+  V = list()
+  
+  
+  
+  
+  
 
-    if (is.null(B0)) B = matrix(0, p, q) else B = B0
 
-    EDx = eigen(Sx, symmetric = TRUE)
-    EDy = eigen(Sy, symmetric = TRUE)
-
-    Ux = EDx$vectors
-    Lx = EDx$values
-    Uy = EDy$vectors
-    Ly = EDy$values
-
-    Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux))
-    Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy))
-
-    b = outer(Lx, Ly) + rho
-    B1 = matmul(matmul(t(Ux), Sxy),  Uy)
-    U = list()
-    V = list()
-    H = matrix(0, p, q)
-
-    for (i in 1:length(lambdas)) {
-      lambda = lambdas[[i]]
-
-      Z = B
-      iter = 0
-      delta = Inf
-
-      while (delta > eps && iter < maxiter) {
-        iter = iter + 1
-
-        B0 = B
-        Btilde = B1 + rho * (t(Ux) %*% (Z - H) %*% Uy)
-        Btilde = Btilde / b
-        B = (Ux %*% Btilde) %*% t(Uy)
-
-        Z = B + H
-        if (is.null(groups)) {
-          Z = soft_thresh(Z, lambda / rho)
-        } else {
-          for (g in seq_along(groups)) {
-            current_indices <- groups[[g]]
-            Z_subset <- Z[current_indices]
-            lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
-            thresholded_values <- soft_thresh2(Z_subset, lambda_g)
-            Z[current_indices] <- thresholded_values
-          }
-        }
-
-        H = H + rho * (B - Z)
-        sB0 <- sum(B0^2)
-        if (sB0 > 1e-20) {
-          delta <- sum((B - B0)^2) / sB0
-        } else {
-          delta <- Inf
-        }
-        if (verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
+  
+  for(i in 1:length(lambdas)) {
+    lambda = lambdas[[i]]
+    
+    # Step 1: ADMM
+    
+    Ztilde =  matrix(0,  min(n, p),  min(n, q))
+    Htilde = matrix(0,  min(n, p),  min(n, q))
+    Btilde = 0
+    iter = 0
+    delta = Inf
+    
+    while(delta > eps && iter < maxiter){
+      iter = iter + 1
+      
+      Btilde0 = Btilde 
+      # Update B
+      #proj = (t(Ux) %*% ( Z - H) %*% Uy) 
+      proj = Ztilde - Htilde
+      
+      Btilde = B1 + rho * proj
+      Btilde = Btilde / b
+      #B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
+      
+      # Update Z
+      
+      #Z = B + H
+      if(iter == 1){
+        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy))
+      } else{
+        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z
       }
-      if (verbose) {
-        if (iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
-        else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
+      
+      
+      if(is.null(groups)){
+        Z = soft_thresh(Z, lambda / rho)
       }
-
-      B = Z
-      C = matmul(matmul(Sx12, B), Sy12)
-      SVD = RSpectra::svds(C, r)
-      U0 = SVD$u
-      V0 = SVD$v
-      L0 = SVD$d
-      inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
-
-      if (max(L0) > 1e-8) {
-        U[[i]] = matmul(matmul(matmul(B, Sy12), V0), diag(inv_L0, nrow = length(L0)))
-        V[[i]] = matmul(matmul(matmul(t(B), Sx12), U0), diag(inv_L0, nrow = length(L0)))
+      else{
+        for (g in seq_along(groups)) {
+          
+          # Get the indices for the current group
+          current_indices <- groups[[g]]
+          
+          # 1. Subset Z only ONCE
+          Z_subset <- Z[current_indices]
+          
+          # 2. Calculate the correctly scaled lambda for this group
+          #    Using nrow() is correct for your 2-column coordinate matrix
+          lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
+          
+          # 3. Apply the single, robust thresholding function
+          thresholded_values <- soft_thresh2(Z_subset, lambda_g)
+          
+          # 4. Assign the result back
+          Z[current_indices] <- thresholded_values
+        }
+        
+        
+        # for (g in 1:length(groups)){
+        #   Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
+        # }
+      }
+      
+      # Update H
+      
+      #H = H + rho * (B - Z)
+      Ztilde =  t(Ux) %*% Z %*% (Uy) 
+      Htilde = Htilde + rho * (Btilde- Ztilde )
+      
+      sB0 <- sum(Btilde0^2)
+      if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
+        delta <- sum((Btilde - Btilde0)^2) / sB0
       } else {
-        U[[i]] = matrix(NA, p, r)
-        V[[i]] = matrix(NA, q, r)
+        delta <- Inf
       }
+      
+      if(verbose && iter %% 10 == 0) cat("\niter:", iter,  "delta:", delta)
     }
+    if (verbose){
+      if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
+      else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
+    }
+    
+    # Step 2: map back
+    
+    B = Z
+    C = matmul(matmul(Sx12, B), Sy12) 
+    
+    
+    SVD = RSpectra::svds(C, r)
+    U0 = SVD$u
+    V0 = SVD$v
+    L0 = SVD$d
+    
 
-    if (length(lambdas) == 1) return(list(U = U[[1]], V = V[[1]]))
-    return(list(U = U, V = V))
-  } else if (optimized) {
-    if (is.null(Sxy)) Sxy = matmul(t(X), Y) / n
-    if (is.null(B0)) B = matrix(0, p, q) else B = B0
-
-    svd_x = svd(X / sqrt(n), nu = 0, nv = min(n, p))
-    svd_y = svd(Y / sqrt(n), nu = 0, nv = min(n, q))
-
-    Lx = pmax(svd_x$d^2, 0)
-    Ly = pmax(svd_y$d^2, 0)
-    keep_x = Lx > 1e-10
-    keep_y = Ly > 1e-10
-    Lx = Lx[keep_x]
-    Ly = Ly[keep_y]
-    Ux = svd_x$v[, keep_x, drop = FALSE]
-    Uy = svd_y$v[, keep_y, drop = FALSE]
-
-    U = list()
-    V = list()
-    H = matrix(0, p, q)
-
-    for (i in 1:length(lambdas)) {
-      lambda = lambdas[[i]]
-      Z = B
-      iter = 0
-      delta = Inf
-
-      while (delta > eps && iter < maxiter) {
-        iter = iter + 1
-        B0 = B
-
-        M = Sxy + rho * (Z - H)
-        if (length(Lx) > 0 && length(Ly) > 0) {
-          A = matmul(matmul(t(Ux), M), Uy)
-          correction_scale = 1 / (outer(Lx, Ly) + rho) - 1 / rho
-          B = M / rho + matmul(matmul(Ux, A * correction_scale), t(Uy))
-        } else {
-          B = M / rho
-        }
-
-        Z = B + H
-        if (is.null(groups)) {
-          Z = soft_thresh(Z, lambda / rho)
-        } else {
-          for (g in seq_along(groups)) {
-            current_indices <- groups[[g]]
-            Z_subset <- Z[current_indices]
-            lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
-            thresholded_values <- soft_thresh2(Z_subset, lambda_g)
-            Z[current_indices] <- thresholded_values
-          }
-        }
-
-        H = H + rho * (B - Z)
-        sB0 <- sum(B0^2)
-        if (sB0 > 1e-20) {
-          delta <- sum((B - B0)^2) / sB0
-        } else {
-          delta <- Inf
-        }
-        if (verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
-      }
-      if (verbose) {
-        if (iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
-        else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
-      }
-
-      B = Z
+    
+    if(max(L0) > 1e-8){
+      U[[i]] = U0 %*% pracma::sqrtm(  matmul(matmul( t(U0)  ,Sx) ,U0) )$Binv 
+      V[[i]] = V0 %*% pracma::sqrtm(  matmul(matmul( t(V0)  ,Sy) ,V0) )$Binv
+    } else{
       U[[i]] = matrix(NA, p, r)
       V[[i]] = matrix(NA, q, r)
 
@@ -728,6 +730,7 @@ ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = FALSE,
   
   return(list(U = ECCA$U, 
               V = ECCA$V, 
+              C = ECCA$C,
               cor = fit_cor, 
               loss = fit_loss,
               lambda.opt  = lambda.opt,
