@@ -1,738 +1,1037 @@
 library(foreach)
 library(caret)
-library(dplyr)
 library(matrixStats)
 
-#' @importFrom magrittr %>%
-#' @importFrom tidyr replace_na
-#' @importFrom stats cor cov median rnorm sd var
-#'
-#' @title Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensional.
-#'
-#' @description Performs group-sparse reduced-rank regression for CCA using either ADMM or CVXR solvers.
-#'
-#' @param X Predictor matrix (n x p)
-#' @param Y Response matrix (n x q)
-#' @param groups List of index vectors defining groups of predictors
-#' @param Sx precomputed covariance matrix for X (optional)
-#' @param Sy precomputed covariance matrix for Y (optional)
-#' @param Sxy precomputed covariance matrix between X and Y (optional)
-#' @param lambda Regularization parameter
-#' @param r Target rank
-#' @param standardize Whether to scale variables
-#' @param B0 Initial value for the coefficient matrix (optional)
-#' @param eps Convergence threshold for ADMM
-#' @param rho ADMM parameter
-#' @param maxiter Maximum number of ADMM iterations
-#' @param verbose Print diagnostics
-#'
-#' @return A list with elements:
-#' \describe{
-#'   \item{U}{Canonical direction matrix for X (p x r)}
-#'   \item{V}{Canonical direction matrix for Y (q x r)}
-#'   \item{cor}{Canonical covariances}
-#'   \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
-#' }
-#' @export
-ecca = function(X, Y, lambda = 0, groups = NULL, Sx = NULL,
-                Sy = NULL, Sxy = NULL, r = 2,  standardize = FALSE,
-                rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = TRUE){
-  
-  p = ncol(X)
-  q = ncol(Y)
-  n = nrow(X)
-  ##### Need to make sure that they are centered
-  if (standardize) {
-    X = scale(X, center = TRUE, scale = TRUE)
-    Y = scale(Y, center = TRUE, scale = TRUE)
-  } 
-
-  if (max(p,q)<n){
-      if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
-    if (is.null(Sx)) Sx = matmul(t(X), X) / n
-    if (is.null(Sy)) {
-      Sy = matmul(t(Y), Y) / n
-    }
-    
-    if(is.null(B0)) B = matrix(0, p, q)
-    else B = B0
-    
-    
-    EDx = eigen(Sx, symmetric = TRUE)
-    EDy = eigen(Sy, symmetric = TRUE)
-    
-    Ux = EDx$vectors[, 1: min(n, p)]
-    Lx = EDx$values[1:min(n, p)]
-    Uy = EDy$vectors[, 1: min(n, q)]
-    Ly = EDy$values[1: min(n, q)]
-    
-    Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux)) 
-    Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy)) 
-    
-    b = outer(Lx, Ly) + rho
-    B1 = matmul(matmul(t(Ux), Sxy),  Uy)
-    U = list()
-    V = list()
-    
-    
-    
-    # Step 1: ADMM
-    
-    
-    Ztilde =  matrix(0,  min(n, p),  min(n, q))
-    Htilde = matrix(0,  min(n, p),  min(n, q))
-    Btilde = 0
-    iter = 0
-    delta = Inf
-    
-    while(delta > eps && iter < maxiter){
-      iter = iter + 1
-      
-      Btilde0 = Btilde 
-      # Update B
-      #proj = (t(Ux) %*% ( Z - H) %*% Uy) 
-      proj = Ztilde - Htilde
-      
-      Btilde = B1 + rho * proj
-      Btilde = Btilde / b
-      #B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
-      
-      # Update Z
-      
-      #Z = B + H
-      if(iter == 1){
-        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy))
-      } else{
-        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z
-      }
-      
-      
-      if(is.null(groups)){
-        Z = soft_thresh(Z, lambda / rho)
-      }
-      else{
-        for (g in seq_along(groups)) {
-    
-          # Get the indices for the current group
-          current_indices <- groups[[g]]
-          
-          # 1. Subset Z only ONCE
-          Z_subset <- Z[current_indices]
-          
-          # 2. Calculate the correctly scaled lambda for this group
-          #    Using nrow() is correct for your 2-column coordinate matrix
-          lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
-          
-          # 3. Apply the single, robust thresholding function
-          thresholded_values <- soft_thresh2(Z_subset, lambda_g)
-          
-          # 4. Assign the result back
-          Z[current_indices] <- thresholded_values
-        }
-
-
-        # for (g in 1:length(groups)){
-        #   Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
-        # }
-      }
-      
-      # Update H
-      
-      #H = H + rho * (B - Z)
-      Ztilde =  t(Ux) %*% Z %*% (Uy) 
-      Htilde = Htilde + rho * (Btilde- Ztilde )
-      
-      sB0 <- sum(Btilde0^2)
-      if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
-        delta <- sum((Btilde - Btilde0)^2) / sB0
-      } else {
-        delta <- Inf
-      }
-      
-      
-      #if(fnorm(B0) > 0) delta = fnorm(B - B0)^2 / fnorm(B0)^2
-      if(verbose && iter %% 10 == 0) cat("\niter:", iter, "delta:", delta)
-    }
-
-    if (verbose){
-      if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
-      else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
-    }
-
-    # Step 2: map back
-    
-    B = Z
-    C = matmul(matmul(Sx12, B), Sy12) 
-    
-    # SVD = svd(C)
-    # U0 = SVD$u[, 1:r, drop = F]
-    # V0 = SVD$v[, 1:r, drop = F]
-    # L0 = SVD$d[1:r]
-
-    if (requireNamespace("RSpectra", quietly = TRUE)) {
-      SVD <- RSpectra::svds(B, r)
-    } else {
-      SVD <- svd(B, nu=r, nv=r)
-    }
-
-
-    U0 = SVD$u
-    V0 = SVD$v
-    L0 = SVD$d
-    
-    inv_L0 <- sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
-    
-    if(max(L0) > 1e-8){
-      
-      U = U0 %*% pracma::sqrtm(  matmul(matmul( t(U0)  ,Sx) ,U0) )$Binv 
-      V = V0 %*% pracma::sqrtm(  matmul(matmul( t(V0)  ,Sy) ,V0)  )$Binv
-      
-      return(list(U = U, V = V, loss = mean(apply((matmul(X,U) - matmul(Y, V))^2,2,sum)), cor = diag(matmul(t(U), matmul(Sxy, V))), C = C ) )
-    } else{
-      U = matrix(NA, p, r)
-      V = matrix(NA, q, r)
-      return(list(U = U, V = V, loss = Inf, cor = rep(0, r), C = C))
-    }
-  
+# -----------------------------
+# Helper: robust chol with jitter
+# -----------------------------
+chol_jitter <- function(G, jitter = 1e-8, max_tries = 6) {
+  p <- nrow(G)
+  for (k in 0:max_tries) {
+    out <- tryCatch(
+      chol(G + (10^k) * jitter * diag(p)),
+      error = function(e) NULL
+    )
+    if (!is.null(out)) return(out)
   }
-  
-
-  
+  stop("chol() failed even with jitter.")
 }
 
+# -----------------------------
+# ecca (single lambda)
+# -----------------------------
+ecca <- function(
+  X, Y,
+  lambda = 0,
+  groups = NULL,
+  r = 2,
+  standardize = FALSE,
+  rho = 1,
+  B0 = NULL,
+  eps = 1e-4,
+  maxiter = 500,
+  verbose = TRUE,
+  epsilon_sv = 1e-8,
+  ridge_whiten = 1e-8
+) {
+  if (!is.matrix(X)) X <- as.matrix(X)
+  if (!is.matrix(Y)) Y <- as.matrix(Y)
+  if (nrow(X) != nrow(Y)) stop("X and Y must have the same number of rows.")
 
+  n  <- nrow(X)
+  p0 <- ncol(X)
+  q0 <- ncol(Y)
+  x_names <- colnames(X)
+  y_names <- colnames(Y)
 
+  if (verbose) cat("eps =", eps, " maxiter =", maxiter, "\n")
 
+  # ---- preprocess: center, drop 0-var, optional scale
+  x_center <- colMeans(X)
+  y_center <- colMeans(Y)
+  X <- sweep(X, 2, x_center, "-")
+  Y <- sweep(Y, 2, y_center, "-")
 
-ecca_across_lambdas = function(X, Y, lambdas = 0, groups = NULL, r = 2,  Sx = NULL,
-                               Sy = NULL, Sxy = NULL, standardize = TRUE,
-                               rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = TRUE,
-                               dense = TRUE, optimized = FALSE){
-  
-  p = ncol(X)
-  q = ncol(Y)
-  n = nrow(X)
-  
-  ##### Need to make sure that they are centered
+  sx <- matrixStats::colSds(X)
+  sy <- matrixStats::colSds(Y)
+
+  keepX <- which(is.finite(sx) & sx > 0)
+  keepY <- which(is.finite(sy) & sy > 0)
+
+  dropX <- setdiff(seq_len(p0), keepX)
+  dropY <- setdiff(seq_len(q0), keepY)
+
+  X <- X[, keepX, drop = FALSE]
+  Y <- Y[, keepY, drop = FALSE]
+
+  x_scale <- rep(1, p0)
+  y_scale <- rep(1, q0)
   if (standardize) {
-    X = scale(X)
-    Y = scale(Y)
-  } 
-  
-  ### This can be improved for memory concern
-  
-  if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
-  if (is.null(Sx)) Sx = matmul(t(X), X) / n
-  if (is.null(Sy)) {
-    Sy = matmul(t(Y), Y) / n
-  }
-  
-  if(is.null(B0)) B = matrix(0, p, q)
-  else B = B0
-  
-  
-  EDx = eigen(Sx, symmetric = TRUE)
-  EDy = eigen(Sy, symmetric = TRUE)
-  
-  Ux = EDx$vectors[, 1: min(n, p)]
-  Lx = EDx$values[1:min(n, p)]
-  Uy = EDy$vectors[, 1: min(n, q)]
-  Ly = EDy$values[1: min(n, q)]
-  
-  Sx12 = matmul(matmul(Ux, diag(sqrt(pmax(Lx, 0)))),  t(Ux)) 
-  Sy12 = matmul(matmul(Uy, diag(sqrt(pmax(Ly, 0)))),  t(Uy)) 
-  
-  b = outer(Lx, Ly) + rho
-  B1 = matmul(matmul(t(Ux), Sxy),  Uy)
-  U = list()
-  V = list()
-  
-  
-  
-  
-  
-
-
-  
-  for(i in 1:length(lambdas)) {
-    lambda = lambdas[[i]]
-    
-    # Step 1: ADMM
-    
-    Ztilde =  matrix(0,  min(n, p),  min(n, q))
-    Htilde = matrix(0,  min(n, p),  min(n, q))
-    Btilde = 0
-    iter = 0
-    delta = Inf
-    
-    while(delta > eps && iter < maxiter){
-      iter = iter + 1
-      
-      Btilde0 = Btilde 
-      # Update B
-      #proj = (t(Ux) %*% ( Z - H) %*% Uy) 
-      proj = Ztilde - Htilde
-      
-      Btilde = B1 + rho * proj
-      Btilde = Btilde / b
-      #B = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z - H
-      
-      # Update Z
-      
-      #Z = B + H
-      if(iter == 1){
-        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy))
-      } else{
-        Z = ((Ux %*% (Btilde - proj) ) %*% t(Uy)) + Z
-      }
-      
-      
-      if(is.null(groups)){
-        Z = soft_thresh(Z, lambda / rho)
-      }
-      else{
-        for (g in seq_along(groups)) {
-          
-          # Get the indices for the current group
-          current_indices <- groups[[g]]
-          
-          # 1. Subset Z only ONCE
-          Z_subset <- Z[current_indices]
-          
-          # 2. Calculate the correctly scaled lambda for this group
-          #    Using nrow() is correct for your 2-column coordinate matrix
-          lambda_g <- sqrt(nrow(current_indices)) * lambda / rho
-          
-          # 3. Apply the single, robust thresholding function
-          thresholded_values <- soft_thresh2(Z_subset, lambda_g)
-          
-          # 4. Assign the result back
-          Z[current_indices] <- thresholded_values
-        }
-        
-        
-        # for (g in 1:length(groups)){
-        #   Z[groups[[g]] ] =  soft_thresh2(Z[groups[[g]] ], sqrt(length(groups[[g]]) ) * lambda/rho)
-        # }
-      }
-      
-      # Update H
-      
-      #H = H + rho * (B - Z)
-      Ztilde =  t(Ux) %*% Z %*% (Uy) 
-      Htilde = Htilde + rho * (Btilde- Ztilde )
-      
-      sB0 <- sum(Btilde0^2)
-      if(sB0 > 1e-20) { # Use a small tolerance instead of > 0 for numerical stability
-        delta <- sum((Btilde - Btilde0)^2) / sB0
-      } else {
-        delta <- Inf
-      }
-      
-      if(verbose && iter %% 10 == 0) cat("\niter:", iter,  "delta:", delta)
-    }
-    if (verbose){
-      if(iter >= maxiter) cat(crayon::red("     ADMM did not converge!"))
-      else cat(paste0(crayon::green("     ADMM converged in ", iter, " iterations")))
-    }
-    
-    # Step 2: map back
-    
-    B = Z
-    C = matmul(matmul(Sx12, B), Sy12) 
-    
-    
-    SVD = RSpectra::svds(C, r)
-    U0 = SVD$u
-    V0 = SVD$v
-    L0 = SVD$d
-    
-
-    
-    if(max(L0) > 1e-8){
-      U[[i]] = U0 %*% pracma::sqrtm(  matmul(matmul( t(U0)  ,Sx) ,U0) )$Binv 
-      V[[i]] = V0 %*% pracma::sqrtm(  matmul(matmul( t(V0)  ,Sy) ,V0) )$Binv
-    } else{
-      U[[i]] = matrix(NA, p, r)
-      V[[i]] = matrix(NA, q, r)
-
-      if (length(Lx) == 0 || length(Ly) == 0) next
-
-      Btilde = matmul(matmul(t(Ux), B), Uy)
-      Csmall = Btilde * Lx
-      Csmall = t(t(Csmall) * Ly)
-      r_eff = min(r, nrow(Csmall), ncol(Csmall))
-      if (r_eff < 1) next
-
-      if (requireNamespace("RSpectra", quietly = TRUE) && r_eff < min(dim(Csmall))) {
-        SVD = RSpectra::svds(Csmall, r_eff)
-      } else {
-        SVD = svd(Csmall, nu = r_eff, nv = r_eff)
-      }
-
-      L0 = SVD$d
-      if (length(L0) == 0 || max(L0) <= 1e-8) next
-
-      inv_L0 = sapply(L0, function(d) ifelse(d > 1e-8, 1/d, 0))
-      termY = matmul(Uy * rep(Ly, each = q), SVD$v)
-      termX = matmul(Ux * rep(Lx, each = p), SVD$u)
-      Ui = matmul(matmul(B, termY), diag(inv_L0, nrow = length(inv_L0)))
-      Vi = matmul(matmul(t(B), termX), diag(inv_L0, nrow = length(inv_L0)))
-      U[[i]][, 1:r_eff] = Ui
-      V[[i]][, 1:r_eff] = Vi
-    }
-
-    if (length(lambdas) == 1) return(list(U = U[[1]], V = V[[1]]))
-    return(list(U = U, V = V))
+    X <- sweep(X, 2, sx[keepX], "/")
+    Y <- sweep(Y, 2, sy[keepY], "/")
+    x_scale[keepX] <- sx[keepX]
+    y_scale[keepY] <- sy[keepY]
   }
 
-  stop("Set either dense=TRUE or optimized=TRUE.")
-}
+  p <- ncol(X)
+  q <- ncol(Y)
 
+  if (p < 1 || q < 1) {
+    return(list(
+      U = matrix(NA_real_, p0, r),
+      V = matrix(NA_real_, q0, r),
+      cor = rep(0, r),
+      loss = Inf,
+      Bhat = matrix(0, p0, q0),
+      keepX = keepX, keepY = keepY, dropX = dropX, dropY = dropY,
+      center = list(X = x_center, Y = y_center),
+      scale  = list(X = x_scale,  Y = y_scale),
+      converged = FALSE
+    ))
+  }
 
+  # ---- map coord groups from ORIGINAL coords to filtered coords
+  if (!is.null(groups)) {
+    mapX <- integer(p0); mapX[keepX] <- seq_along(keepX)
+    mapY <- integer(q0); mapY[keepY] <- seq_along(keepY)
 
-ecca.eval = function(X, Y,  lambdas = 0, groups = NULL, r = 2, 
-                     standardize = TRUE, Sx = NULL, Sy = NULL, Sxy = NULL,
-                     rho = 1, B0 = NULL, nfold = 5, eps = 1e-4,
-                     maxiter = 500, verbose = TRUE, parallel = TRUE,
-                     nb_cores = NULL, set_seed_cv=NULL, scoring_method = "mse",
-                     cv_use_median = FALSE, dense = TRUE, optimized = FALSE){
-  p = ncol(X)
-  q = ncol(Y)
-  n = nrow(X)
-  if (n < 2 * nfold) {
-    if (verbose){
-      cat(crayon::yellow(paste0("\nWarning: Sample size (n=", n, ") is too small for ", nfold, "-fold CV. Skipping CV and fitting with the first lambda value.")))
+    groups <- lapply(groups, function(idx) {
+      if (is.matrix(idx) && ncol(idx) == 2) {
+        ix <- mapX[idx[, 1]]
+        iy <- mapY[idx[, 2]]
+        ok <- (ix > 0) & (iy > 0)
+        if (!any(ok)) return(matrix(integer(0), ncol = 2))
+        cbind(ix[ok], iy[ok])
+      } else {
+        idx
+      }
+    })
+  }
+
+  # ---- linearize groups once + precompute sqrt(|g|)
+  group_sqrt <- NULL
+  if (!is.null(groups)) {
+    groups_lin <- vector("list", length(groups))
+    group_sqrt <- numeric(length(groups))
+    for (g in seq_along(groups)) {
+      idx <- groups[[g]]
+      if (is.matrix(idx) && ncol(idx) == 2) {
+        groups_lin[[g]] <- as.integer(idx[, 1] + (idx[, 2] - 1L) * p)
+        group_sqrt[g] <- sqrt(nrow(idx))
+      } else {
+        groups_lin[[g]] <- idx
+        group_sqrt[g] <- sqrt(length(idx))
+      }
     }
-    lambda.min = lambdas[1]
-    lambda.1se =lambdas[1]
-    scores = NULL
+    groups <- groups_lin
+  }
+
+  # ---- reduced bases via SVD
+  EDx <- svd(X, nu = 0, nv = min(n, p))
+  EDy <- svd(Y, nu = 0, nv = min(n, q))
+
+  Ux_all <- EDx$v
+  Uy_all <- EDy$v
+  Lx_all <- (EDx$d^2) / n
+  Ly_all <- (EDy$d^2) / n
+
+  idx_x <- which(Lx_all > epsilon_sv)
+  idx_y <- which(Ly_all > epsilon_sv)
+  if (length(idx_x) < 1 || length(idx_y) < 1) {
+    U_full <- matrix(0, p0, r)
+    V_full <- matrix(0, q0, r)
+    if (!is.null(x_names)) rownames(U_full) <- x_names
+    if (!is.null(y_names)) rownames(V_full) <- y_names
+    return(list(
+      U = U_full, V = V_full, cor = rep(0, r), loss = Inf,
+      Bhat = matrix(0, p0, q0),
+      keepX = keepX, keepY = keepY, dropX = dropX, dropY = dropY,
+      center = list(X = x_center, Y = y_center),
+      scale  = list(X = x_scale,  Y = y_scale),
+      converged = FALSE
+    ))
+  }
+
+  Ux <- Ux_all[, idx_x, drop = FALSE]; Lx <- Lx_all[idx_x]
+  Uy <- Uy_all[, idx_y, drop = FALSE]; Ly <- Ly_all[idx_y]
+  UyT <- t(Uy)
+
+  kx <- length(Lx)
+  ky <- length(Ly)
+
+  b <- outer(Lx, Ly) + rho
+
+  # B1 = (X Ux)^T (Y Uy) / n
+  XUx <- X %*% Ux
+  YUy <- Y %*% Uy
+  B1  <- crossprod(XUx, YUy) / n
+  rm(XUx, YUy)
+
+  # choose multiplication order once
+  use_left_Low    <- (p * ky <= kx * q)
+  use_left_Ztilde <- (kx * q <= p * ky)
+
+  # ---- ADMM (low-memory)
+  if (!is.null(B0)) {
+    Z <- B0[keepX, keepY, drop = FALSE]
   } else {
-    
-    ##### Need to make sure that they are centered
+    Z <- matrix(0, p, q)
+  }
+
+  # Ztilde = Ux^T Z Uy with order choice
+  if (use_left_Ztilde) {
+    Ztilde <- crossprod(Ux, Z) %*% Uy
+  } else {
+    Ztilde <- crossprod(Ux, Z %*% Uy)
+  }
+  Htilde <- matrix(0, kx, ky)
+
+  converged <- FALSE
+  tau_base <- lambda / rho   
+
+  for (iter in 1:maxiter) {
+
+    proj   <- Ztilde - Htilde
+    Btilde <- (B1 + rho * proj) / b
+    M      <- Btilde - proj
+
+    # Low = Ux M Uy^T
+    if (use_left_Low) {
+      tmp <- Ux %*% M
+      Low <- tmp %*% UyT
+    } else {
+      tmp <- M %*% UyT
+      Low <- Ux %*% tmp
+    }
+
+    # Z_in = Low + Z   (no Z_old copy)
+    Z_in <- Low + Z
+
+    if (is.null(groups)) {
+      Z <- soft_thresh(Z_in, tau_base)
+    } else {
+      Z <- Z_in
+      for (g in seq_along(groups)) {
+        idx <- groups[[g]]
+        if (length(idx) == 0) next
+        Z[idx] <- soft_thresh2(Z[idx], group_sqrt[g] * tau_base)
+      }
+    }
+
+    # update Ztilde
+    if (use_left_Ztilde) {
+      Ztilde_new <- crossprod(Ux, Z) %*% Uy
+    } else {
+      Ztilde_new <- crossprod(Ux, Z %*% Uy)
+    }
+
+    Htilde <- Htilde + (Btilde - Ztilde_new)
+
+    r_norm <- sqrt(sum((Btilde - Ztilde_new)^2))
+    s_norm <- rho * sqrt(sum((Ztilde_new - Ztilde)^2))
+
+    eps_pri  <- eps * (1 + max(sqrt(sum(Btilde^2)), sqrt(sum(Ztilde_new^2))))
+    eps_dual <- eps * (1 + sqrt(sum(Htilde^2)))
+
+    if (verbose && (iter %% 50 == 0)) {
+      cat("\niter:", iter, " r:", signif(r_norm, 3), " s:", signif(s_norm, 3))
+    }
+
+    Ztilde <- Ztilde_new
+    if (r_norm < eps_pri && s_norm < eps_dual) {
+      converged <- TRUE
+      break
+    }
+  }
+
+  if (verbose) {
+    if (!converged) cat("\nADMM did not converge (hit maxiter).\n")
+    else cat("\nADMM converged.\n")
+  }
+
+  # ---- postprocessing (small SVD)
+  r_eff <- min(r, nrow(Ztilde), ncol(Ztilde))
+  if (r_eff < 1) {
+    U_full <- matrix(0, p0, r)
+    V_full <- matrix(0, q0, r)
+    if (!is.null(x_names)) rownames(U_full) <- x_names
+    if (!is.null(y_names)) rownames(V_full) <- y_names
+    Bhat_full <- matrix(0, p0, q0); Bhat_full[keepX, keepY] <- Z
+    return(list(
+      U = U_full, V = V_full, cor = rep(0, r), loss = Inf,
+      Bhat = Bhat_full,
+      keepX = keepX, keepY = keepY, dropX = dropX, dropY = dropY,
+      center = list(X = x_center, Y = y_center),
+      scale  = list(X = x_scale,  Y = y_scale),
+      converged = converged
+    ))
+  }
+
+  Csmall <- Ztilde
+  Csmall <- sweep(Csmall, 1, sqrt(Lx), "*")
+  Csmall <- sweep(Csmall, 2, sqrt(Ly), "*")
+
+  if (requireNamespace("RSpectra", quietly = TRUE) && r_eff < min(dim(Csmall))) {
+    SVDs <- RSpectra::svds(Csmall, r_eff)
+  } else {
+    SVDs <- svd(Csmall, nu = r_eff, nv = r_eff)
+  }
+
+  U0 <- Ux %*% SVDs$u
+  V0 <- Uy %*% SVDs$v
+
+  GX <- crossprod(X %*% U0) / n + ridge_whiten * diag(r_eff)
+  GY <- crossprod(Y %*% V0) / n + ridge_whiten * diag(r_eff)
+
+  Rx <- chol_jitter(GX, jitter = ridge_whiten)
+  Ry <- chol_jitter(GY, jitter = ridge_whiten)
+
+  U <- U0 %*% backsolve(Rx, diag(r_eff))
+  V <- V0 %*% backsolve(Ry, diag(r_eff))
+
+  XU <- X %*% U
+  YV <- Y %*% V
+  cor <- diag(crossprod(XU, YV) / n)
+
+  neg <- cor < 0
+  if (any(neg)) {
+    V[, neg] <- -V[, neg, drop = FALSE]
+    cor[neg] <- -cor[neg]
+    YV[, neg] <- -YV[, neg, drop = FALSE]
+  }
+
+  ord <- order(cor, decreasing = TRUE)
+  cor <- cor[ord]
+  U <- U[, ord, drop = FALSE]
+  V <- V[, ord, drop = FALSE]
+  XU <- XU[, ord, drop = FALSE]
+  YV <- YV[, ord, drop = FALSE]
+
+  loss <- sum((XU - YV)^2) / n
+
+  # ---- inflate to original coords
+  U_full <- matrix(0, p0, r_eff)
+  V_full <- matrix(0, q0, r_eff)
+  U_full[keepX, ] <- U
+  V_full[keepY, ] <- V
+
+  if (!is.null(x_names)) rownames(U_full) <- x_names
+  if (!is.null(y_names)) rownames(V_full) <- y_names
+  colnames(U_full) <- paste0("comp", seq_len(r_eff))
+  colnames(V_full) <- paste0("comp", seq_len(r_eff))
+
+  Bhat_full <- matrix(0, p0, q0)
+  Bhat_full[keepX, keepY] <- Z
+
+  list(
+    U = U_full,
+    V = V_full,
+    cor = cor,
+    loss = loss,
+    Bhat = Bhat_full,
+    keepX = keepX, keepY = keepY, dropX = dropX, dropY = dropY,
+    center = list(X = x_center, Y = y_center),
+    scale  = list(X = x_scale,  Y = y_scale),
+    converged = converged
+  )
+}
+
+# -----------------------------
+# ecca_across_lambdas (lambda path, CV-friendly)
+# -----------------------------
+ecca_across_lambdas <- function(
+  X, Y, lambdas = 0, groups = NULL, r = 2,
+  Sx = NULL, Sy = NULL, Sxy = NULL,                 # kept for compatibility; ignored
+  standardize = TRUE,
+  rho = 1, B0 = NULL, eps = 1e-4, maxiter = 500, verbose = TRUE,
+  dense = TRUE, optimized = FALSE,                  # kept for compatibility; ignored
+  epsilon_sv = 1e-8, ridge_whiten = 1e-8,
+  warm_start = TRUE,
+  lambda_order = c("decreasing", "increasing", "given"),
+  log_prefix = "",
+  admm_print_every = 50L,
+  lambda_print = TRUE,
+  collect_logs = FALSE,
+  preprocess = TRUE,
+  return_uv = TRUE,
+  X_val = NULL, Y_val = NULL,
+  scoring_method = c("mse", "trace")
+){
+  scoring_method <- match.arg(scoring_method)
+  lambda_order <- match.arg(lambda_order)
+
+  if (!is.matrix(X)) X <- as.matrix(X)
+  if (!is.matrix(Y)) Y <- as.matrix(Y)
+  if (nrow(X) != nrow(Y)) stop("X and Y must have same nrow().")
+  logs <- character(0)
+
+  lambdas <- as.numeric(lambdas)
+  L <- length(lambdas)
+  if (L < 1) stop("lambdas must have length >= 1")
+
+  ord <- switch(
+    lambda_order,
+    decreasing = order(lambdas, decreasing = TRUE),
+    increasing = order(lambdas, decreasing = FALSE),
+    given      = seq_along(lambdas)
+  )
+  inv_ord <- order(ord)
+  lambdas_run <- lambdas[ord]
+
+  p0 <- ncol(X); q0 <- ncol(Y)
+  x_names <- colnames(X); y_names <- colnames(Y)
+
+  keepX <- seq_len(p0); keepY <- seq_len(q0)
+  centerX <- rep(0, p0); centerY <- rep(0, q0)
+  scaleX  <- rep(1, p0); scaleY  <- rep(1, q0)
+
+  if (preprocess) {
+    centerX <- colMeans(X); centerY <- colMeans(Y)
+    X <- sweep(X, 2, centerX, "-")
+    Y <- sweep(Y, 2, centerY, "-")
+
+    sx <- matrixStats::colSds(X)
+    sy <- matrixStats::colSds(Y)
+
+    keepX <- which(is.finite(sx) & sx > 0)
+    keepY <- which(is.finite(sy) & sy > 0)
+
+    X <- X[, keepX, drop = FALSE]
+    Y <- Y[, keepY, drop = FALSE]
+
     if (standardize) {
-      X = scale(X)
-      Y = scale(Y)
-    } 
-    if (is.null(Sxy)) Sxy = matmul(t(X), Y)/ n
-    if (is.null(Sx)) Sx = matmul(t(X), X) /n
-        if (is.null(Sy)) {
-          Sy = matmul(t(Y), Y) / n
+      X <- sweep(X, 2, sx[keepX], "/")
+      Y <- sweep(Y, 2, sy[keepY], "/")
+      scaleX[keepX] <- sx[keepX]
+      scaleY[keepY] <- sy[keepY]
+    }
+
+    # map coord groups (original -> filtered)
+    if (!is.null(groups)) {
+      mapX <- integer(p0); mapX[keepX] <- seq_along(keepX)
+      mapY <- integer(q0); mapY[keepY] <- seq_along(keepY)
+
+      groups <- lapply(groups, function(idx) {
+        if (is.matrix(idx) && ncol(idx) == 2) {
+          ix <- mapX[idx[, 1]]
+          iy <- mapY[idx[, 2]]
+          ok <- (ix > 0) & (iy > 0)
+          if (!any(ok)) return(matrix(integer(0), ncol = 2))
+          cbind(ix[ok], iy[ok])
+        } else {
+          idx
         }
-    
-    
-    
-    
-    ## Create folds
-    if (is.null(set_seed_cv) == FALSE){
-       set.seed(set_seed_cv)
-    }
-   
-
-    
-    folds = caret::createFolds(1:n, k = nfold, list = TRUE)
-    n_success = nfold
-    ## Choose penalty lambda
-    results <- data.frame(lambda = numeric(), mse = numeric(), se = numeric())
-    
-    if (parallel) {
-      if (!requireNamespace("doParallel", quietly = TRUE)) {
-      stop("Package 'doParallel' must be installed to use the parallelization option.",
-          call. = FALSE)
-      }
-
-      if (!requireNamespace("crayon", quietly = TRUE)) {
-      stop("Package 'crayon' must be installed to use the parallelization option.",
-          call. = FALSE)
-      }
-    # --- GRACEFUL PARALLEL SETUP ---
-      cl <- setup_parallel_backend(nb_cores)
-      
-      if (!is.null(cl)) {
-        # If the cluster was created successfully, register it and plan to stop it
-        if(verbose) { cat(crayon::green("Parallel backend successfully registered.\n"))}
-        doParallel::registerDoParallel(cl)
-        on.exit(parallel::stopCluster(cl), add = TRUE)
-      } else {
-        # If setup_parallel_backend returned NULL, print a warning and proceed serially
-        warning("All parallel setup attempts failed. Proceeding in serial mode.", immediate. = TRUE)
-        parallel <- FALSE # Ensure %dopar% runs serially
-    }
-   }
-
-   if (parallel) {
-  
-      ## Parallel cross validation
-      cv = foreach(fold = folds, 
-                   .export = c("ecca", "ecca_across_lambdas", "matmul", "fnorm", "soft_thresh", "soft_thresh_group", "soft_thresh2"), 
-                   .packages = c("SMUT", "crayon"),
-                   .errorhandling = 'pass') %dopar% {
-                     
-                     n_full <- nrow(X)
-                     X_train <- X[-fold, ]
-                     Y_train <- Y[-fold, ]
-                     X_val <- X[fold, ]
-                     Y_val <- Y[fold, ]
-                     
-                     # We don't even need to create X_train and Y_train explicitly for the covariance calculation
-                     n_train <- n_full - nrow(X_val)
-                     
-                     # --- DOWNDATE TRICK ---
-                     Sx_train <- (n_full * Sx - crossprod(X_val)) / n_train
-                     Sy_train <- (n_full * Sy - crossprod(Y_val)) / n_train
-                     Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
-                     
-                     ## Fit lasso model
-                     ECCA = ecca_across_lambdas(X[-fold,,drop = FALSE], Y[-fold,,drop = FALSE], 
-                                                Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
-                                                standardize = FALSE,
-                                                lambdas=lambdas, groups=groups, r=r, rho=rho, 
-                                                B0=B0, eps=eps, maxiter=maxiter, verbose = verbose,
-                                                dense = dense, optimized = optimized)
-                     
-                     ## Evaluate on test set
-                     scores = rep(0, length(lambdas))
-                     for(i in 1:length(lambdas)){
-                       if(length(lambdas) > 1){
-                         U = (ECCA$U)[[i]]
-                         V = (ECCA$V)[[i]]
-                       } else {
-                         U = ECCA$U
-                         V = ECCA$V
-                       }
-                       
-                       X_val_mat <- X[fold, , drop = FALSE]
-                       Y_val_mat <- Y[fold, , drop = FALSE]
-                       
-                       #if(is.na(U)) scores[i] = NA
-                     
-                      if (!is.null(U) && !any(is.na(U))) {
-                              if (scoring_method == "mse") {
-                                  scores[i] = mean((matmul(X_val_mat, U) - Y_val_mat %*% V)^2)
-                              } else if (scoring_method == "trace") {
-                                  scores[i] = -sum(diag(t(U) %*% t(X_val_mat) %*% Y_val_mat %*% V))
-                              } else {
-                                  stop("Unknown scoring method. Use 'mse' or 'trace'.")
-                              }
-                      } else {
-                              scores[i] = Inf
-                      }
-                         
-                   
-            
-                     }
-                     return(scores)
-                   }
-      
-      
-      # --- Post-processing to handle potential errors ---
-      # Identify which folds resulted in an error
-      is_error <- sapply(cv, function(x) inherits(x, "error"))
-      
-      if(any(is_error)){
-        warning(paste(sum(is_error), "out of", nfold, "folds failed during cross-validation."))
-        # Optional: print the actual error messages for debugging
-        # print(cv_results_list[is_error])
-      }
-      
-      # Filter out the errors and combine the successful results
-      successful_results <- cv[!is_error]
-      
-      # If all folds failed, we can't proceed
-      if(length(successful_results) == 0) {
-        stop("All CV folds failed. Cannot select a lambda.")
-      }
-      
-      scores.cv = do.call(cbind, successful_results)
-      n_success <- length(successful_results)
-    } else {
-      ## Store successful results in a list
-      cv_results_list <- list()
-
-      for(i in 1:length(folds)){
-        if(verbose) print(paste0("\n\nfold:", i))
-        
-        # Wrap the fold computation in tryCatch to handle potential errors
-        result <- tryCatch({
-          fold = folds[[i]]
-          
-          n_full <- nrow(X)
-          X_val <- X[fold, ]
-          Y_val <- Y[fold, ]
-          n_train <- n_full - nrow(X_val)
-          
-          # --- DOWNDATE TRICK ---
-          Sx_train <- (n_full * Sx - crossprod(X_val)) / n_train
-          Sy_train <- (n_full * Sy - crossprod(Y_val)) / n_train
-          Sxy_train <- (n_full * Sxy - crossprod(X_val, Y_val)) / n_train
-          
-          ## Fit lasso model
-          ECCA = ecca_across_lambdas(X[-fold,,drop = FALSE], Y[-fold,,drop = FALSE], 
-                                     Sx = Sx_train, Sy = Sy_train, Sxy = Sxy_train,
-                                     standardize = FALSE,
-                                     lambdas = lambdas, groups = groups, r = r, 
-                                     rho = rho, B0 = B0, eps= eps, maxiter = maxiter, verbose = verbose,
-                                     dense = dense, optimized = optimized)
-          
-          ## Evaluate on test set
-          scores = rep(0, length(lambdas))
-          # Use 'j' for the inner loop to avoid conflict with 'i'
-          for(j in 1:length(lambdas)){
-            if(length(lambdas) > 1){
-              U = (ECCA$U)[[j]]
-              V = (ECCA$V)[[j]]
-            } else {
-              U = ECCA$U
-              V = ECCA$V
-            }
-            
-            X_val_mat <- X[fold, , drop = FALSE]
-            Y_val_mat <- Y[fold, , drop = FALSE]
-            
-            if (!is.null(U) && !any(is.na(U))) {
-                  if (scoring_method == "mse") {
-                      scores[j] = mean((matmul(X_val_mat, U) - Y_val_mat %*% V)^2)
-                  } else if (scoring_method == "trace") {
-                      scores[j] = -sum(diag(t(U) %*% t(X_val_mat) %*% Y_val_mat %*% V)/nrow(X_val_mat))
-                  } else {
-                      stop("Unknown scoring method. Use 'mse' or 'trace'.")
-                  }
-            } else {
-                  scores[j] = Inf
-            }
-          }
-            
-          
-          if(verbose) print(paste("\n\nMSEs:", scores))
-          
-          # Return the scores vector on success
-          scores 
-          
-        }, error = function(e) {
-          # If an error occurs, return the error object
-          warning(paste("Fold", i, "failed with error:", e$message))
-          return(e)
-        })
-        
-        # Append the result (scores or error) to the list
-        cv_results_list[[i]] <- result
-      }
-    
-      
-      # --- Post-processing to handle potential errors (same as in parallel block) ---
-      is_error <- sapply(cv_results_list, function(x) inherits(x, "error"))
-      
-      if(any(is_error)){
-        warning(paste(sum(is_error), "out of", length(folds), "folds failed during cross-validation."))
-      }
-      
-      # Filter out the errors
-      successful_results <- cv_results_list[!is_error]
-      
-      # Stop if all folds failed
-      if(length(successful_results) == 0) {
-        stop("All CV folds failed. Cannot select a lambda.")
-      }
-      
-      # Combine successful results and set n_success
-      scores.cv = do.call(cbind, successful_results)
-      n_success <- length(successful_results)
+      })
     }
 
-
-   if (cv_use_median == FALSE) {
-      scores = data.frame(lambda = lambdas, mse = rowMeans(scores.cv), 
-                          se = matrixStats::rowSds(scores.cv)/sqrt(n_success))
-   }else {
-      scores = data.frame(lambda = lambdas, mse =apply(scores.cv, 1, median), 
-                          se = matrixStats::rowSds(scores.cv)/sqrt(n_success))
-   }
-
-    lambda.min = scores %>% dplyr::slice(which.min(mse)) %>% dplyr::pull(lambda)
-    upper = scores %>% dplyr::slice(which.min(mse)) %>% dplyr::mutate(upper = mse + se) %>% dplyr::pull(upper)
-    lambda.1se = scores %>% dplyr::filter(mse <= upper) %>% dplyr::pull(lambda) %>% max()
+    # preprocess validation too
+    if (!is.null(X_val) && !is.null(Y_val)) {
+      if (!is.matrix(X_val)) X_val <- as.matrix(X_val)
+      if (!is.matrix(Y_val)) Y_val <- as.matrix(Y_val)
+      X_val <- sweep(X_val, 2, centerX, "-")
+      Y_val <- sweep(Y_val, 2, centerY, "-")
+      X_val <- X_val[, keepX, drop = FALSE]
+      Y_val <- Y_val[, keepY, drop = FALSE]
+      if (standardize) {
+        X_val <- sweep(X_val, 2, scaleX[keepX], "/")
+        Y_val <- sweep(Y_val, 2, scaleY[keepY], "/")
+      }
+    }
+  } else {
+    if (!is.null(X_val) && !is.null(Y_val)) {
+      if (!is.matrix(X_val)) X_val <- as.matrix(X_val)
+      if (!is.matrix(Y_val)) Y_val <- as.matrix(Y_val)
+    }
   }
-  return(list(scores = scores, lambda.min = lambda.min, lambda.1se = lambda.1se))
+
+  n <- nrow(X)
+  p <- ncol(X); q <- ncol(Y)
+
+  # linearize groups once + precompute sqrt(|g|)
+  group_sqrt <- NULL
+  if (!is.null(groups)) {
+    groups_lin <- vector("list", length(groups))
+    group_sqrt <- numeric(length(groups))
+    for (g in seq_along(groups)) {
+      idx <- groups[[g]]
+      if (is.matrix(idx) && ncol(idx) == 2) {
+        groups_lin[[g]] <- as.integer(idx[, 1] + (idx[, 2] - 1L) * p)
+        group_sqrt[g] <- sqrt(nrow(idx))
+      } else {
+        groups_lin[[g]] <- idx
+        group_sqrt[g] <- sqrt(length(idx))
+      }
+    }
+    groups <- groups_lin
+  }
+
+  if (p < 1 || q < 1) {
+    out_scores <- rep(Inf, L)
+    if (!return_uv) return(list(scores = out_scores[inv_ord], lambdas = lambdas))
+    Uout <- lapply(seq_len(L), function(.) matrix(NA_real_, p0, r))
+    Vout <- lapply(seq_len(L), function(.) matrix(NA_real_, q0, r))
+    return(list(U = Uout, V = Vout, scores = out_scores[inv_ord], lambdas = lambdas))
+  }
+
+  # reduced bases
+  EDx <- svd(X, nu = 0, nv = min(n, p))
+  EDy <- svd(Y, nu = 0, nv = min(n, q))
+
+  Ux_all <- EDx$v
+  Uy_all <- EDy$v
+  Lx_all <- (EDx$d^2) / n
+  Ly_all <- (EDy$d^2) / n
+
+  idx_x <- which(Lx_all > epsilon_sv)
+  idx_y <- which(Ly_all > epsilon_sv)
+  if (length(idx_x) < 1 || length(idx_y) < 1) {
+    out_scores <- rep(Inf, L)
+    if (!return_uv) return(list(scores = out_scores[inv_ord], lambdas = lambdas))
+    Uout <- lapply(seq_len(L), function(.) matrix(NA_real_, p0, r))
+    Vout <- lapply(seq_len(L), function(.) matrix(NA_real_, q0, r))
+    return(list(U = Uout, V = Vout, scores = out_scores[inv_ord], lambdas = lambdas))
+  }
+
+  Ux <- Ux_all[, idx_x, drop = FALSE]; Lx <- Lx_all[idx_x]
+  Uy <- Uy_all[, idx_y, drop = FALSE]; Ly <- Ly_all[idx_y]
+  UyT <- t(Uy)
+
+  kx <- length(Lx); ky <- length(Ly)
+  b  <- outer(Lx, Ly) + rho
+
+  # B1 once
+  XUx <- X %*% Ux
+  YUy <- Y %*% Uy
+  B1  <- crossprod(XUx, YUy) / n
+  rm(XUx, YUy)
+
+  use_left_Low    <- (p * ky <= kx * q)
+  use_left_Ztilde <- (kx * q <= p * ky)
+
+  compute_Ztilde <- function(Zmat) {
+    if (use_left_Ztilde) crossprod(Ux, Zmat) %*% Uy
+    else crossprod(Ux, Zmat %*% Uy)
+  }
+  compute_Low <- function(M) {
+    if (use_left_Low) (Ux %*% M) %*% UyT
+    else Ux %*% (M %*% UyT)
+  }
+
+  out_scores <- rep(NA_real_, L)
+  out_cor    <- vector("list", L)
+  out_loss   <- rep(NA_real_, L)
+  out_U      <- if (return_uv) vector("list", L) else NULL
+  out_V      <- if (return_uv) vector("list", L) else NULL
+
+  if (!is.null(B0)) {
+    Z <- if (preprocess) B0[keepX, keepY, drop = FALSE] else B0
+  } else {
+    Z <- matrix(0, p, q)
+  }
+  admm_print_every <- as.integer(admm_print_every)
+  if (!is.finite(admm_print_every) || admm_print_every < 1L) admm_print_every <- 50L
+
+  for (t in seq_len(L)) {
+    lam <- lambdas_run[t]
+    t_lambda0 <- Sys.time()
+    if (verbose && lambda_print) {
+      cat(sprintf("\nStarting lambda %d/%d: %g", t, L, lam))
+      cat(sprintf("\n%s lambda %d/%d = %g", log_prefix, t, L, lam))
+      flush.console()
+      if (collect_logs) {
+        logs <- c(logs,
+                  sprintf("Starting lambda %d/%d: %g", t, L, lam),
+                  sprintf("%s lambda %d/%d = %g", log_prefix, t, L, lam))
+      }
+    }
+
+
+    if (!warm_start && t > 1) Z <- matrix(0, p, q)
+
+    Ztilde <- compute_Ztilde(Z)
+    Htilde <- matrix(0, kx, ky)
+
+    tau_base <- lam / rho
+    converged <- FALSE
+
+    for (iter in seq_len(maxiter)) {
+      proj   <- Ztilde - Htilde
+      Btilde <- (B1 + rho * proj) / b
+      M      <- Btilde - proj
+
+      Low <- compute_Low(M)
+
+      Z_in <- Low + Z
+
+      if (is.null(groups)) {
+        Z <- soft_thresh(Z_in, tau_base)
+      } else {
+        Z <- Z_in
+        for (g in seq_along(groups)) {
+          idx <- groups[[g]]
+          if (length(idx) == 0) next
+          Z[idx] <- soft_thresh2(Z[idx], group_sqrt[g] * tau_base)
+        }
+      }
+
+      Ztilde_new <- compute_Ztilde(Z)
+      Htilde <- Htilde + (Btilde - Ztilde_new)
+
+      r_norm <- sqrt(sum((Btilde - Ztilde_new)^2))
+      s_norm <- rho * sqrt(sum((Ztilde_new - Ztilde)^2))
+
+      eps_pri  <- eps * (1 + max(sqrt(sum(Btilde^2)), sqrt(sum(Ztilde_new^2))))
+      eps_dual <- eps * (1 + sqrt(sum(Htilde^2)))
+
+      if (verbose && iter %% 100 == 0) {
+        cat("\nlambda", signif(lam, 3), "iter", iter,
+            "r", signif(r_norm, 3), "s", signif(s_norm, 3))
+        if (collect_logs) {
+          logs <- c(logs, sprintf("lambda %s iter %d r %s s %s",
+                                  signif(lam, 3), iter, signif(r_norm, 3), signif(s_norm, 3)))
+        }
+      }
+          # inside ADMM iter loop
+      if (verbose && (iter %% admm_print_every == 0L)) {
+        cat(sprintf("\n%s   iter %d  r=%g  s=%g", log_prefix, iter, r_norm, s_norm))
+        flush.console()
+        if (collect_logs) {
+          logs <- c(logs, sprintf("%s   iter %d  r=%g  s=%g", log_prefix, iter, r_norm, s_norm))
+        }
+      }
+
+      Ztilde <- Ztilde_new
+      if (r_norm < eps_pri && s_norm < eps_dual) {
+        converged <- TRUE
+        break
+      }
+    }
+
+    # postprocessing small SVD
+    Csmall <- Ztilde
+    Csmall <- sweep(Csmall, 1, sqrt(Lx), "*")
+    Csmall <- sweep(Csmall, 2, sqrt(Ly), "*")
+
+    r_eff <- min(r, nrow(Csmall), ncol(Csmall))
+    if (r_eff < 1) {
+      out_scores[t] <- Inf
+      out_loss[t]   <- Inf
+      out_cor[[t]]  <- rep(0, r)
+      if (return_uv) {
+        out_U[[t]] <- matrix(0, p0, r)
+        out_V[[t]] <- matrix(0, q0, r)
+      }
+      next
+    }
+
+    if (requireNamespace("RSpectra", quietly = TRUE) && r_eff < min(dim(Csmall))) {
+      SVDs <- RSpectra::svds(Csmall, r_eff)
+    } else {
+      SVDs <- svd(Csmall, nu = r_eff, nv = r_eff)
+    }
+
+    U0 <- Ux %*% SVDs$u
+    V0 <- Uy %*% SVDs$v
+
+    GX <- crossprod(X %*% U0) / n + ridge_whiten * diag(r_eff)
+    GY <- crossprod(Y %*% V0) / n + ridge_whiten * diag(r_eff)
+
+    Rx <- chol_jitter(GX, jitter = ridge_whiten)
+    Ry <- chol_jitter(GY, jitter = ridge_whiten)
+
+    Uhat <- U0 %*% backsolve(Rx, diag(r_eff))
+    Vhat <- V0 %*% backsolve(Ry, diag(r_eff))
+
+    XU <- X %*% Uhat
+    YV <- Y %*% Vhat
+    cor <- diag(crossprod(XU, YV) / n)
+
+    neg <- cor < 0
+    if (any(neg)) {
+      Vhat[, neg] <- -Vhat[, neg, drop = FALSE]
+      cor[neg] <- -cor[neg]
+      YV[, neg] <- -YV[, neg, drop = FALSE]
+    }
+
+    ord_cor <- order(cor, decreasing = TRUE)
+    cor <- cor[ord_cor]
+    Uhat <- Uhat[, ord_cor, drop = FALSE]
+    Vhat <- Vhat[, ord_cor, drop = FALSE]
+    XU <- XU[, ord_cor, drop = FALSE]
+    YV <- YV[, ord_cor, drop = FALSE]
+
+    if (!is.null(X_val) && !is.null(Y_val)) {
+      XU_val <- X_val %*% Uhat
+      YV_val <- Y_val %*% Vhat
+      if (scoring_method == "mse") {
+        out_scores[t] <- mean((XU_val - YV_val)^2)
+      } else {
+        out_scores[t] <- -sum(diag(crossprod(XU_val, YV_val))) / nrow(X_val)
+      }
+    } else {
+      out_scores[t] <- NA_real_
+    }
+
+    out_loss[t]  <- sum((XU - YV)^2) / n
+    out_cor[[t]] <- cor
+
+    if (return_uv) {
+      U_full <- matrix(0, p0, r_eff)
+      V_full <- matrix(0, q0, r_eff)
+      U_full[keepX, ] <- Uhat
+      V_full[keepY, ] <- Vhat
+      if (!is.null(x_names)) rownames(U_full) <- x_names
+      if (!is.null(y_names)) rownames(V_full) <- y_names
+      out_U[[t]] <- U_full
+      out_V[[t]] <- V_full
+    }
+    if (verbose && lambda_print) {
+      cat(sprintf("\nFinished lambda %d/%d in %.1fs",
+                  t, L, as.numeric(difftime(Sys.time(), t_lambda0, units="secs"))))
+      if (collect_logs) {
+        logs <- c(logs, sprintf("Finished lambda %d/%d in %.1fs",
+                                t, L, as.numeric(difftime(Sys.time(), t_lambda0, units="secs"))))
+      }
+    }
+  }
+
+  # restore original lambda order
+  out_scores <- out_scores[inv_ord]
+  out_loss   <- out_loss[inv_ord]
+  out_cor    <- out_cor[inv_ord]
+  if (return_uv) {
+    out_U <- out_U[inv_ord]
+    out_V <- out_V[inv_ord]
+  }
+
+  if (!return_uv) {
+    out <- list(scores = out_scores, lambdas = lambdas)
+    if (collect_logs) out$logs <- logs
+    return(out)
+  }
+
+  if (length(lambdas) == 1) {
+    out <- list(U = out_U[[1]], V = out_V[[1]],
+                cor = out_cor[[1]], loss = out_loss[1],
+                scores = out_scores, lambdas = lambdas,
+                center = list(X = centerX, Y = centerY),
+                scale  = list(X = scaleX,  Y = scaleY),
+                keepX = keepX, keepY = keepY)
+    if (collect_logs) out$logs <- logs
+    return(out)
+  }
+
+  out <- list(U = out_U, V = out_V,
+              cor = out_cor, loss = out_loss,
+              scores = out_scores, lambdas = lambdas,
+              center = list(X = centerX, Y = centerY),
+              scale  = list(X = scaleX,  Y = scaleY),
+              keepX = keepX, keepY = keepY)
+  if (collect_logs) out$logs <- logs
+  out
 }
 
-#' Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensional, with Cross-Validation
-#'
-#' Performs group-sparse reduced-rank regression for CCA using either ADMM or CVXR solvers.
-#'
-#' @param X Predictor matrix (n x p)
-#' @param Y Response matrix (n x q)
-#' @param groups List of index vectors defining groups of predictors
-#' @param lambdas Choice of regularization parameter 
-#' @param r Target rank
-#' @param nfold Number of cross-validation folds
-#' @param select Which lambda to select: "lambda.min" or "lambda.1se"
-#' @param standardize Whether to scale variables
-#' @param B0 Initial value for the coefficient matrix (optional)
-#' @param eps Convergence threshold for ADMM
-#' @param rho ADMM parameter
-#' @param maxiter Maximum number of ADMM iterations
-#' @param verbose Print diagnostics
-#' @param nb_cores Number of cores to use for parallel processing (default is NULL, which uses all available cores)
-#' @param set_seed_cv Optional seed for reproducibility of cross-validation folds (de)
-#' @param parallel Whether to run cross-validation in parallel
-#' @param scoring_method Method to score the model during cross-validation, either "mse" (mean squared error) or "trace" (trace of the product of matrices)
-#' @param cv_use_median Whether to use the median of the cross-validation scores instead of the mean. Default is FALSE.
-#'
-#' @return A list with elements:
-#' \describe{
-#'   \item{U}{Canonical direction matrix for X (p x r)}
-#'   \item{V}{Canonical direction matrix for Y (q x r)}
-#'   \item{cor}{Canonical covariances}
-#'   \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
-#' }
-#' @export
-ecca.cv = function(X, Y, lambdas = 0, groups = NULL, r = 2, standardize = FALSE,
-                   rho = 1, B0 = NULL, nfold = 5, select = "lambda.min", eps = 1e-4, maxiter = 500, 
-                   verbose = FALSE, parallel = FALSE,
-                   nb_cores = NULL,
-                   set_seed_cv=NULL, scoring_method = "mse", cv_use_median = FALSE,
-                   dense = TRUE, optimized = FALSE){
-  p = ncol(X)
-  q = ncol(Y)
-  n = nrow(X)
-  
-  if (standardize) {
-    X = scale(X)
-    Y = scale(Y)
-  } 
-  
-  # Select lambda
-  if(length(lambdas) > 1){
-    eval = ecca.eval(X, Y, lambdas=lambdas, groups=groups, r=r, rho=rho,
-                     standardize = FALSE,
-                     B0 = B0, nfold=nfold, eps=eps,  maxiter=maxiter, verbose=verbose, parallel= parallel,
-                     nb_cores = nb_cores, set_seed_cv=set_seed_cv, scoring_method = scoring_method, cv_use_median = cv_use_median,
-                     dense = dense, optimized = optimized)
-    if(select == "lambda.1se") lambda.opt = eval$lambda.1se
-    else lambda.opt = eval$lambda.min
-  } else {
-    lambda.opt = lambdas
-  }
-  if (verbose) { cat("\n\nselected lambda:", lambda.opt)}
-  
-  # Fit lasso
-  ECCA = ecca(X, Y, lambda=lambda.opt, groups = groups, r=r, rho=rho, B0=B0, eps=eps, 
-              standardize = FALSE,
-              maxiter = maxiter, verbose = verbose)
+# -----------------------------
+# ecca.eval (CV) - with seamless group mapping + faster parallel behavior
+# -----------------------------
+ecca.eval <- function(
+  X, Y, lambdas = 0, groups = NULL, r = 2,
+  standardize = TRUE,
+  rho = 1, B0 = NULL, nfold = 5,
+  eps = 1e-4, maxiter = 500, verbose = TRUE,
+  parallel = TRUE, nb_cores = NULL, set_seed_cv = NULL,
+  scoring_method = c("mse", "trace"),
+  cv_use_median = FALSE,
+  dense = TRUE, optimized = FALSE,
+  epsilon_sv = 1e-8, ridge_whiten = 1e-8
+){
+  scoring_method <- match.arg(scoring_method)
+  if (!is.matrix(X)) X <- as.matrix(X)
+  if (!is.matrix(Y)) Y <- as.matrix(Y)
+  if (nrow(X) != nrow(Y)) stop("X and Y must have same nrow().")
 
-  if (any(is.na(ECCA$U)) || any(is.na(ECCA$V))) {
-    fit_cor <- rep(NA, r)
-    fit_loss <- Inf
-  } else {
-    fit_cor <- diag(matmul(matmul(t(ECCA$U), matmul(t(X), Y)), ECCA$V))/nrow(X)
-    fit_loss <- mean(apply((matmul(X , ECCA$U) - matmul(Y , ECCA$V))^2/nrow(X), 2, sum))
+  n <- nrow(X)
+  if (n < 2 * nfold) {
+    if (verbose) cat("\nWarning: n too small for CV; using first lambda.\n")
+    scores <- data.frame(lambda = lambdas, mse = NA_real_, se = NA_real_)
+    return(list(scores = scores, lambda.min = lambdas[1], lambda.1se = lambdas[1]))
   }
-  
-  return(list(U = ECCA$U, 
-              V = ECCA$V, 
-              C = ECCA$C,
-              cor = fit_cor, 
-              loss = fit_loss,
-              lambda.opt  = lambda.opt,
-              cv.scores = eval$scores))
+
+  # global preprocessing
+  p0 <- ncol(X); q0 <- ncol(Y)
+
+  X <- scale(X, center = TRUE, scale = FALSE)
+  Y <- scale(Y, center = TRUE, scale = FALSE)
+
+  sx <- matrixStats::colSds(X)
+  sy <- matrixStats::colSds(Y)
+  keepX <- which(is.finite(sx) & sx > 0)
+  keepY <- which(is.finite(sy) & sy > 0)
+
+  X <- X[, keepX, drop = FALSE]
+  Y <- Y[, keepY, drop = FALSE]
+
+  if (standardize) {
+    X <- sweep(X, 2, sx[keepX], "/")
+    Y <- sweep(Y, 2, sy[keepY], "/")
+  }
+
+  n <- nrow(X)
+
+  # IMPORTANT: map groups to the filtered coordinates ONCE (since preprocess=FALSE in folds)
+  if (!is.null(groups)) {
+    mapX <- integer(p0); mapX[keepX] <- seq_along(keepX)
+    mapY <- integer(q0); mapY[keepY] <- seq_along(keepY)
+
+    groups <- lapply(groups, function(idx) {
+      if (is.matrix(idx) && ncol(idx) == 2) {
+        ix <- mapX[idx[, 1]]
+        iy <- mapY[idx[, 2]]
+        ok <- (ix > 0) & (iy > 0)
+        if (!any(ok)) return(matrix(integer(0), ncol = 2))
+        cbind(ix[ok], iy[ok])
+      } else {
+        idx
+      }
+    })
+  }
+
+  if (!is.null(set_seed_cv)) set.seed(set_seed_cv)
+  folds <- caret::createFolds(seq_len(n), k = nfold, list = TRUE)
+
+  # parallel setup
+  if (parallel) {
+    if (!requireNamespace("doParallel", quietly = TRUE) ||
+        !requireNamespace("foreach", quietly = TRUE)) {
+      warning("Parallel requested but doParallel/foreach not available; running serial.")
+      parallel <- FALSE
+    }
+  }
+
+  if (parallel) {
+    cores <- if (is.null(nb_cores)) max(1L, parallel::detectCores() - 1L) else as.integer(nb_cores)
+    cores <- min(cores, length(folds))
+    Sys.setenv(
+      OMP_NUM_THREADS = 1,
+      OPENBLAS_NUM_THREADS = 1,
+      MKL_NUM_THREADS = 1,
+      VECLIB_MAXIMUM_THREADS = 1
+    )
+
+    # Use PSOCK when verbose so worker stdout forwarding is more reliable.
+    # Use FORK only when quiet.
+    if (verbose) {
+      cl <- parallel::makeCluster(cores, type = "PSOCK", outfile = "")
+    } else {
+      cl <- tryCatch(parallel::makeCluster(cores, type = "FORK", outfile = ""), error = function(e) NULL)
+      if (is.null(cl)) cl <- parallel::makeCluster(cores, type = "PSOCK", outfile = "")
+    }
+
+    doParallel::registerDoParallel(cl)
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+    if (verbose) {
+      cat("\nRunning CV in parallel on", cores, "cores (cluster type:", cl$clusterType, ")\n")
+    }
+
+    parallel::clusterEvalQ(cl, {
+      Sys.setenv(
+        OMP_NUM_THREADS = 1,
+        OPENBLAS_NUM_THREADS = 1,
+        MKL_NUM_THREADS = 1,
+        VECLIB_MAXIMUM_THREADS = 1
+      )
+      NULL
+    })
+
+
+    # ---- inside ecca.eval(), after folds created and parallel backend registered ----
+
+    t0 <- Sys.time()
+    pb <- utils::txtProgressBar(min = 0, max = length(folds), style = 3)
+    done <- 0L
+
+    combine_with_progress <- function(acc, ...) {
+      xs <- list(...)
+      for (x in xs) {
+        done <<- done + 1L
+        utils::setTxtProgressBar(pb, done)
+
+        # print a short line so you see activity in long runs
+        elapsed <- difftime(Sys.time(), t0, units = "secs")
+        cat(sprintf("\n[%s] finished fold %d/%d (elapsed %.1fs)",
+                    format(Sys.time(), "%H:%M:%S"),
+                    done, length(folds), as.numeric(elapsed)))
+
+        if (!inherits(x, "error") && is.list(x) && !is.null(x$logs) && length(x$logs) > 0) {
+          cat("\n")
+          cat(paste(x$logs, collapse = "\n"))
+          cat("\n")
+          flush.console()
+          x <- x$scores
+        }
+
+        acc <- c(acc, list(x))
+      }
+      acc
+    }
+
+    cv_list <- foreach::foreach(
+      fold_id = seq_along(folds),
+      .combine = combine_with_progress,
+      .init = list(),
+      .multicombine = TRUE,
+      .inorder = FALSE,
+      .export = c("ecca_across_lambdas", "soft_thresh", "soft_thresh2", "chol_jitter"),
+      .packages = c("matrixStats"),   # <-- don’t force-load RSpectra
+      .errorhandling = "pass"
+    ) %dopar% {
+
+      fold <- folds[[fold_id]]
+      pid <- Sys.getpid()
+      prefix <- sprintf("[pid=%d fold=%d]", pid, fold_id)
+
+      tr <- setdiff(seq_len(n), fold)
+      Xtr <- X[tr, , drop = FALSE]
+      Ytr <- Y[tr, , drop = FALSE]
+      Xva <- X[fold, , drop = FALSE]
+      Yva <- Y[fold, , drop = FALSE]
+
+      fit <- ecca_across_lambdas(
+        Xtr, Ytr, lambdas = lambdas, groups = groups, r = r,
+        standardize = FALSE, rho = rho, B0 = B0,
+        eps = eps, maxiter = maxiter,
+        verbose = TRUE,                 # <-- TURN ON worker printing
+        log_prefix = prefix,            # <-- NEW
+        admm_print_every = 50L,
+        lambda_print = TRUE,            # <-- NEW
+        epsilon_sv = epsilon_sv, ridge_whiten = ridge_whiten,
+        preprocess = FALSE,
+        return_uv = FALSE,
+        collect_logs = TRUE,
+        X_val = Xva, Y_val = Yva,
+        scoring_method = scoring_method
+      )
+
+      list(scores = fit$scores, logs = fit$logs)
+    }
+
+    close(pb)
+    cat("\n")  # newline after progress bar
+
+    is_err <- vapply(cv_list, inherits, logical(1), "error")
+
+    if (all(is_err)) {
+      msgs <- unique(vapply(cv_list, function(e) {
+        msg <- tryCatch(conditionMessage(e), error = function(...) "")
+        if (!nzchar(msg)) msg <- paste(class(e), collapse = "/")
+        msg
+      }, character(1)))
+      stop("All CV folds failed. Example error(s):\n- ",
+           paste(head(msgs, 5), collapse = "\n- "))
+    }
+
+    if (any(is_err)) warning(sum(is_err), " folds failed.")
+    cv_list <- cv_list[!is_err]
+    if (length(cv_list) == 0) stop("All CV folds failed.")
+    scores.cv <- do.call(cbind, cv_list)
+    n_success <- ncol(scores.cv)
+
+    
+
+  } else {
+    cv_list <- lapply(folds, function(fold) {
+      tryCatch({
+        tr <- setdiff(seq_len(n), fold)
+        Xtr <- X[tr, , drop = FALSE]
+        Ytr <- Y[tr, , drop = FALSE]
+        Xva <- X[fold, , drop = FALSE]
+        Yva <- Y[fold, , drop = FALSE]
+
+        fit <- ecca_across_lambdas(
+          Xtr, Ytr, lambdas = lambdas, groups = groups, r = r,
+          standardize = FALSE, rho = rho, B0 = B0,
+          eps = eps, maxiter = maxiter, verbose = TRUE,
+          epsilon_sv = epsilon_sv, ridge_whiten = ridge_whiten,
+          preprocess = FALSE,
+          return_uv = FALSE,
+          X_val = Xva, Y_val = Yva,
+          scoring_method = scoring_method
+        )
+        fit$scores
+      }, error = function(e) e)
+    })
+
+    is_err <- vapply(cv_list, inherits, logical(1), "error")
+    if (any(is_err)) warning(sum(is_err), " folds failed.")
+    cv_list <- cv_list[!is_err]
+    if (length(cv_list) == 0) stop("All CV folds failed.")
+    scores.cv <- do.call(cbind, cv_list)
+    n_success <- ncol(scores.cv)
+  }
+
+  if (!cv_use_median) {
+    mse <- rowMeans(scores.cv)
+  } else {
+    mse <- apply(scores.cv, 1, median)
+  }
+  se <- matrixStats::rowSds(scores.cv) / sqrt(n_success)
+  scores <- data.frame(lambda = lambdas, mse = mse, se = se)
+
+  lambda.min <- scores$lambda[which.min(scores$mse)]
+  upper <- scores$mse[which.min(scores$mse)] + scores$se[which.min(scores$mse)]
+  lambda.1se <- max(scores$lambda[scores$mse <= upper])
+
+  list(scores = scores, lambda.min = lambda.min, lambda.1se = lambda.1se)
+}
+
+# -----------------------------
+# ecca.cv (unchanged API; just uses the above)
+# -----------------------------
+ecca.cv <- function(
+  X, Y, lambdas = 0, groups = NULL, r = 2, standardize = FALSE,
+  rho = 1, B0 = NULL, nfold = 5, select = "lambda.min",
+  eps = 1e-3, maxiter = 1000, verbose = FALSE, maxiter_cv = 300,
+  parallel = FALSE, nb_cores = NULL, set_seed_cv = NULL,
+  scoring_method = c("mse", "trace"), cv_use_median = FALSE,
+  dense = TRUE, optimized = FALSE,
+  epsilon_sv = 1e-8, ridge_whiten = 1e-8
+){
+  scoring_method <- match.arg(scoring_method)
+
+  eval <- NULL
+  if (length(lambdas) > 1) {
+    eval <- ecca.eval(
+      X, Y, lambdas = lambdas, groups = groups, r = r,
+      standardize = standardize,
+      rho = rho, B0 = B0, nfold = nfold,
+      eps = eps, maxiter = maxiter_cv, verbose = verbose,
+      parallel = parallel, nb_cores = nb_cores, set_seed_cv = set_seed_cv,
+      scoring_method = scoring_method, cv_use_median = cv_use_median,
+      epsilon_sv = epsilon_sv, ridge_whiten = ridge_whiten
+    )
+    lambda.opt <- if (select == "lambda.1se") eval$lambda.1se else eval$lambda.min
+  } else {
+    lambda.opt <- as.numeric(lambdas)
+  }
+
+  if (verbose) cat("\nselected lambda:", lambda.opt, "\n")
+
+  fit <- ecca_across_lambdas(
+    X, Y, lambdas = lambda.opt, groups = groups, r = r,
+    standardize = standardize,
+    rho = rho, B0 = B0, eps = eps, maxiter = maxiter, verbose = verbose,
+    epsilon_sv = epsilon_sv, ridge_whiten = ridge_whiten,
+    preprocess = TRUE,
+    return_uv = TRUE
+  )
+
+  out <- list(
+    U = fit$U,
+    V = fit$V,
+    cor = fit$cor,
+    loss = fit$loss,
+    lambda.opt = lambda.opt
+  )
+  if (!is.null(eval)) out$cv.scores <- eval$scores
+  out
 }

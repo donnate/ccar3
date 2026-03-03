@@ -22,7 +22,9 @@ ecca.cv(
   nb_cores = NULL,
   set_seed_cv = NULL,
   scoring_method = "mse",
-  cv_use_median = FALSE
+  cv_use_median = FALSE,
+  dense = TRUE,
+  optimized = FALSE
 )
 }
 \arguments{
