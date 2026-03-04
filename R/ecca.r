@@ -18,6 +18,71 @@ chol_jitter <- function(G, jitter = 1e-8, max_tries = 6) {
 }
 
 # -----------------------------
+# Helper: inverse square root for PSD matrices (eigen fallback)
+# -----------------------------
+invsqrt_psd <- function(G, eps = 1e-8) {
+  G <- (G + t(G)) / 2
+  ed <- eigen(G, symmetric = TRUE)
+  vals <- pmax(ed$values, eps)
+  ed$vectors %*% diag(1 / sqrt(vals), nrow = length(vals)) %*% t(ed$vectors)
+}
+
+# -----------------------------
+# Helper: whitening factor G^{-1/2}, with chol then eigen fallback
+# -----------------------------
+whiten_factor <- function(G, ridge = 1e-8, verbose = FALSE) {
+  if (any(!is.finite(G))) {
+    if (verbose) cat("\nNon-finite entries in whitening Gram matrix; sanitizing.\n")
+    G[!is.finite(G)] <- 0
+    G <- (G + t(G)) / 2 + ridge * diag(nrow(G))
+  }
+  tryCatch({
+    R <- chol_jitter(G, jitter = ridge)
+    backsolve(R, diag(nrow(G)))
+  }, error = function(e) {
+    if (verbose) cat("\nchol_jitter failed; using eigen whitening fallback.\n")
+    invsqrt_psd(G, eps = ridge)
+  })
+}
+
+# -----------------------------
+# Helper: stable rank-k SVD with fallback
+# -----------------------------
+safe_rank_svd <- function(M, k, prefer_sparse = FALSE) {
+  if (k < 1) return(NULL)
+  nr <- nrow(M); nc <- ncol(M)
+  if (nr < 1 || nc < 1) return(NULL)
+  k <- min(k, nr, nc)
+
+  out <- NULL
+
+  if (requireNamespace("RSpectra", quietly = TRUE) && k < min(nr, nc)) {
+    out <- tryCatch({
+      if (prefer_sparse && requireNamespace("Matrix", quietly = TRUE)) {
+        RSpectra::svds(Matrix::Matrix(M, sparse = TRUE), k)
+      } else {
+        RSpectra::svds(M, k)
+      }
+    }, error = function(e) NULL)
+
+    if (!is.null(out)) {
+      ok <- all(is.finite(out$u)) && all(is.finite(out$v)) && all(is.finite(out$d))
+      if (!ok) out <- NULL
+    }
+  }
+
+  if (is.null(out)) {
+    out <- tryCatch(svd(as.matrix(M), nu = k, nv = k), error = function(e) NULL)
+    if (is.null(out)) return(NULL)
+    out$u <- out$u[, seq_len(k), drop = FALSE]
+    out$v <- out$v[, seq_len(k), drop = FALSE]
+    out$d <- out$d[seq_len(k)]
+  }
+
+  out
+}
+
+# -----------------------------
 # ecca (single lambda)
 # -----------------------------
 ecca <- function(
@@ -267,31 +332,101 @@ ecca <- function(
     ))
   }
 
-  Csmall <- Ztilde
-  Csmall <- sweep(Csmall, 1, sqrt(Lx), "*")
-  Csmall <- sweep(Csmall, 2, sqrt(Ly), "*")
+  # Csmall <- Ztilde
+  # Csmall <- sweep(Csmall, 1, sqrt(Lx), "*")
+  # Csmall <- sweep(Csmall, 2, sqrt(Ly), "*")
 
-  if (requireNamespace("RSpectra", quietly = TRUE) && r_eff < min(dim(Csmall))) {
-    SVDs <- RSpectra::svds(Csmall, r_eff)
-  } else {
-    SVDs <- svd(Csmall, nu = r_eff, nv = r_eff)
+  # --- SVD on sparse Z (preserves row sparsity) ---
+  SVDs <- safe_rank_svd(Z, r_eff, prefer_sparse = TRUE)
+  if (is.null(SVDs)) {
+    if (verbose) cat("\nSVD failed in ecca(). Returning NA directions.\n")
+    U_full <- matrix(NA_real_, p0, r)
+    V_full <- matrix(NA_real_, q0, r)
+    if (!is.null(x_names)) rownames(U_full) <- x_names
+    if (!is.null(y_names)) rownames(V_full) <- y_names
+    Bhat_full <- matrix(0, p0, q0)
+    Bhat_full[keepX, keepY] <- Z
+    return(list(
+      U = U_full,
+      V = V_full,
+      cor = rep(0, r),
+      loss = Inf,
+      Bhat = Bhat_full,
+      keepX = keepX, keepY = keepY, dropX = dropX, dropY = dropY,
+      center = list(X = x_center, Y = y_center),
+      scale  = list(X = x_scale,  Y = y_scale),
+      converged = FALSE
+    ))
   }
 
-  U0 <- Ux %*% SVDs$u
-  V0 <- Uy %*% SVDs$v
+  U0 <- SVDs$u
+  V0 <- SVDs$v
 
-  GX <- crossprod(X %*% U0) / n + ridge_whiten * diag(r_eff)
-  GY <- crossprod(Y %*% V0) / n + ridge_whiten * diag(r_eff)
+  # --- whitening ---
+  XU0 <- X %*% U0
+  YV0 <- Y %*% V0
 
-  Rx <- chol_jitter(GX, jitter = ridge_whiten)
-  Ry <- chol_jitter(GY, jitter = ridge_whiten)
+  GX <- crossprod(XU0) / n + ridge_whiten * diag(r_eff)
+  GY <- crossprod(YV0) / n + ridge_whiten * diag(r_eff)
 
-  U <- U0 %*% backsolve(Rx, diag(r_eff))
-  V <- V0 %*% backsolve(Ry, diag(r_eff))
+  WGX <- tryCatch(
+    whiten_factor(GX, ridge = ridge_whiten, verbose = verbose),
+    error = function(e) NULL
+  )
+  WGY <- tryCatch(
+    whiten_factor(GY, ridge = ridge_whiten, verbose = verbose),
+    error = function(e) NULL
+  )
+  if (is.null(WGX) || is.null(WGY)) {
+    if (verbose) cat("\nWhitening failed in ecca(). Returning NA directions.\n")
+    U_full <- matrix(NA_real_, p0, r)
+    V_full <- matrix(NA_real_, q0, r)
+    if (!is.null(x_names)) rownames(U_full) <- x_names
+    if (!is.null(y_names)) rownames(V_full) <- y_names
+    Bhat_full <- matrix(0, p0, q0)
+    Bhat_full[keepX, keepY] <- Z
+    return(list(
+      U = U_full,
+      V = V_full,
+      cor = rep(0, r),
+      loss = Inf,
+      Bhat = Bhat_full,
+      keepX = keepX, keepY = keepY, dropX = dropX, dropY = dropY,
+      center = list(X = x_center, Y = y_center),
+      scale  = list(X = x_scale,  Y = y_scale),
+      converged = FALSE
+    ))
+  }
+
+  U <- U0 %*% WGX
+  V <- V0 %*% WGY
 
   XU <- X %*% U
   YV <- Y %*% V
+
   cor <- diag(crossprod(XU, YV) / n)
+
+  # if (requireNamespace("RSpectra", quietly = TRUE) && r_eff < min(dim(Csmall))) {
+  #   SVDs <- RSpectra::svds(Csmall, r_eff)
+  # } else {
+  #   SVDs <- svd(Csmall, nu = r_eff, nv = r_eff)
+  # }
+
+  # U0 <- Ux %*% SVDs$u
+  # V0 <- Uy %*% SVDs$v
+
+  # GX <- crossprod(X %*% U0) / n + ridge_whiten * diag(r_eff)
+  # GY <- crossprod(Y %*% V0) / n + ridge_whiten * diag(r_eff)
+
+  # Rx <- chol_jitter(GX, jitter = ridge_whiten)
+  # Ry <- chol_jitter(GY, jitter = ridge_whiten)
+
+  # U <- U0 %*% backsolve(Rx, diag(r_eff))
+  # V <- V0 %*% backsolve(Ry, diag(r_eff))
+
+  # XU <- X %*% U
+  # YV <- Y %*% V
+  # cor <- diag(crossprod(XU, YV) / n)
 
   neg <- cor < 0
   if (any(neg)) {
@@ -326,6 +461,7 @@ ecca <- function(
   list(
     U = U_full,
     V = V_full,
+    Ux = Ux, Uy = Uy, Lx = Lx, Ly = Ly,
     cor = cor,
     loss = loss,
     Bhat = Bhat_full,
@@ -624,26 +760,59 @@ ecca_across_lambdas <- function(
       next
     }
 
-    if (requireNamespace("RSpectra", quietly = TRUE) && r_eff < min(dim(Csmall))) {
-      SVDs <- RSpectra::svds(Csmall, r_eff)
-    } else {
-      SVDs <- svd(Csmall, nu = r_eff, nv = r_eff)
+    SVDs <- safe_rank_svd(Z, r_eff, prefer_sparse = TRUE)
+    if (is.null(SVDs)) {
+      out_scores[t] <- Inf
+      out_loss[t]   <- Inf
+      out_cor[[t]]  <- rep(0, r)
+      if (return_uv) {
+        out_U[[t]] <- matrix(0, p0, r)
+        out_V[[t]] <- matrix(0, q0, r)
+      }
+      if (collect_logs) {
+        logs <- c(logs, sprintf("%s SVD failed at lambda=%g; assigned Inf score", log_prefix, lam))
+      }
+      next
     }
 
-    U0 <- Ux %*% SVDs$u
-    V0 <- Uy %*% SVDs$v
+    Uhat <- SVDs$u
+    Vhat <- SVDs$v
 
-    GX <- crossprod(X %*% U0) / n + ridge_whiten * diag(r_eff)
-    GY <- crossprod(Y %*% V0) / n + ridge_whiten * diag(r_eff)
+    # --- whitening ---
+    XU0 <- X %*% Uhat
+    YV0 <- Y %*% Vhat
 
-    Rx <- chol_jitter(GX, jitter = ridge_whiten)
-    Ry <- chol_jitter(GY, jitter = ridge_whiten)
+    GX <- crossprod(XU0) / n + ridge_whiten * diag(r_eff)
+    GY <- crossprod(YV0) / n + ridge_whiten * diag(r_eff)
 
-    Uhat <- U0 %*% backsolve(Rx, diag(r_eff))
-    Vhat <- V0 %*% backsolve(Ry, diag(r_eff))
+    WGX <- tryCatch(
+      whiten_factor(GX, ridge = ridge_whiten, verbose = FALSE),
+      error = function(e) NULL
+    )
+    WGY <- tryCatch(
+      whiten_factor(GY, ridge = ridge_whiten, verbose = FALSE),
+      error = function(e) NULL
+    )
+    if (is.null(WGX) || is.null(WGY)) {
+      out_scores[t] <- Inf
+      out_loss[t]   <- Inf
+      out_cor[[t]]  <- rep(0, r)
+      if (return_uv) {
+        out_U[[t]] <- matrix(0, p0, r)
+        out_V[[t]] <- matrix(0, q0, r)
+      }
+      if (collect_logs) {
+        logs <- c(logs, sprintf("%s whitening failed at lambda=%g; assigned Inf score", log_prefix, lam))
+      }
+      next
+    }
+
+    Uhat <- Uhat %*% WGX
+    Vhat <- Vhat %*% WGY
 
     XU <- X %*% Uhat
     YV <- Y %*% Vhat
+
     cor <- diag(crossprod(XU, YV) / n)
 
     neg <- cor < 0
@@ -666,7 +835,9 @@ ecca_across_lambdas <- function(
       if (scoring_method == "mse") {
         out_scores[t] <- mean((XU_val - YV_val)^2)
       } else {
-        out_scores[t] <- -sum(diag(crossprod(XU_val, YV_val))) / nrow(X_val)
+        #
+        #out_scores[t] <- -sum(diag(crossprod(XU_val, YV_val))) / nrow(X_val)
+        out_scores[t] = -mean(diag(cor(XU_val, YV_val)))
       }
     } else {
       out_scores[t] <- NA_real_
@@ -726,7 +897,8 @@ ecca_across_lambdas <- function(
               scores = out_scores, lambdas = lambdas,
               center = list(X = centerX, Y = centerY),
               scale  = list(X = scaleX,  Y = scaleY),
-              keepX = keepX, keepY = keepY)
+              keepX = keepX, keepY = keepY,
+              Ux = Ux, Uy = Uy, Lx = Lx, Ly = Ly)
   if (collect_logs) out$logs <- logs
   out
 }
@@ -881,7 +1053,11 @@ ecca.eval <- function(
       .init = list(),
       .multicombine = TRUE,
       .inorder = FALSE,
-      .export = c("ecca_across_lambdas", "soft_thresh", "soft_thresh2", "chol_jitter"),
+      .export = c(
+        "ecca_across_lambdas",
+        "soft_thresh", "soft_thresh2",
+        "chol_jitter", "invsqrt_psd", "whiten_factor", "safe_rank_svd"
+      ),
       .packages = c("matrixStats"),   # <-- don’t force-load RSpectra
       .errorhandling = "pass"
     ) %dopar% {
@@ -970,11 +1146,12 @@ ecca.eval <- function(
   }
 
   if (!cv_use_median) {
-    mse <- rowMeans(scores.cv)
+    mse <- rowMeans(scores.cv, na.rm = TRUE)
   } else {
-    mse <- apply(scores.cv, 1, median)
+    mse <- apply(scores.cv, 1, median, na.rm = TRUE)
   }
-  se <- matrixStats::rowSds(scores.cv) / sqrt(n_success)
+  se <- matrixStats::rowSds(scores.cv, na.rm = TRUE) / sqrt(n_success)
+  se[!is.finite(se)] <- NA_real_
   scores <- data.frame(lambda = lambdas, mse = mse, se = se)
 
   lambda.min <- scores$lambda[which.min(scores$mse)]
@@ -1016,10 +1193,15 @@ ecca.cv <- function(
 
   if (verbose) cat("\nselected lambda:", lambda.opt, "\n")
 
+  final_verbose <- verbose || (length(lambdas) > 1)
+  if (final_verbose) cat("\nRefitting at selected lambda with ADMM logs...\n")
+
   fit <- ecca_across_lambdas(
     X, Y, lambdas = lambda.opt, groups = groups, r = r,
     standardize = standardize,
-    rho = rho, B0 = B0, eps = eps, maxiter = maxiter, verbose = verbose,
+    rho = rho, B0 = B0, eps = eps, maxiter = maxiter, verbose = final_verbose,
+    admm_print_every = 10L,
+    lambda_print = TRUE,
     epsilon_sv = epsilon_sv, ridge_whiten = ridge_whiten,
     preprocess = TRUE,
     return_uv = TRUE
