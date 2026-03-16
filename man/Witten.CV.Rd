@@ -21,9 +21,13 @@ Witten.CV(
 
 \item{n.cv}{Number of cross-validation folds (default is 5)}
 
+\item{rank}{Number of canonical components to extract}
+
 \item{lambdax}{Vector of sparsity parameters for X (default is a sequence from 0 to 1 with step 0.1)}
 
 \item{lambday}{Vector of sparsity parameters for Y (default is a sequence from 0 to 1 with step 0.1)}
+
+\item{standardize}{Standardize (center and scale) the data matrices X and Y (default is TRUE) before analysis}
 }
 \value{
 the appropriate levels of regularisation

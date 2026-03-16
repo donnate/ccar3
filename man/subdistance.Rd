@@ -2,14 +2,17 @@
 % Please edit documentation in R/metrics.R
 \name{subdistance}
 \alias{subdistance}
-\title{Calculate subdistance between subspace spanned by the columns of a and the subspace spanned by the columns of b}
+\title{Subdistance between subspaces}
 \usage{
 subdistance(A, B)
 }
 \arguments{
-\item{a}{A matrix whose columns span a subspace.}
+\item{A}{A matrix whose columns span a subspace.}
 
-\item{b}{A matrix whose columns span a subspace.}
+\item{B}{A matrix whose columns span a subspace.}
+}
+\value{
+subdistance between the two subspaces spanned by the matrices A and B, defined as min(O orthogonal) ||AO-B||_F
 }
 \description{
 Calculate subdistance between subspace spanned by the columns of a and the subspace spanned by the columns of b

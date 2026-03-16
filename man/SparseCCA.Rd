@@ -42,6 +42,8 @@ SparseCCA(
 \item{max.iter}{Maximum number of iterations for convergence (default is 20)}
 
 \item{conv}{Convergence threshold (default is 1e-2)}
+
+\item{standardize}{Standardize (center and scale) the data matrices X and Y (default is TRUE) before analysis}
 }
 \value{
 A list with elements:

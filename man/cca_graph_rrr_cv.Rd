@@ -13,6 +13,7 @@ cca_graph_rrr_cv(
   kfolds = 5,
   parallelize = FALSE,
   standardize = TRUE,
+  preprocess = NULL,
   LW_Sy = FALSE,
   rho = 10,
   niter = 10000,
@@ -38,7 +39,9 @@ cca_graph_rrr_cv(
 
 \item{parallelize}{Whether to parallelize cross-validation}
 
-\item{standardize}{Whether to center and scale X and Y (default FALSE = center only)}
+\item{standardize}{Backward-compatible preprocessing flag: TRUE = \code{"scale"}, FALSE = \code{"center"}.}
+
+\item{preprocess}{Preprocessing mode. One of \code{"scale"} (center + scale), \code{"center"} (center only), or \code{"none"}.}
 
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
 
@@ -54,11 +57,7 @@ cca_graph_rrr_cv(
 
 \item{Gamma_dagger}{Optional pseudoinverse of Gamma (computed if NULL)}
 
-\item{Sx}{Optional covariance matrix for X. If NULL, computed as t(X) \%*\% X / n}
-
-\item{Sy}{Optional covariance matrix for Y. If NULL, computed similarly; optionally shrunk via Ledoit-Wolf}
-
-\item{Sxy}{Optional cross-covariance matrix (not currently used)}
+\item{nb_cores}{Number of cores to use for parallelization (default is all available cores minus 1)}
 }
 \value{
 A list with elements:

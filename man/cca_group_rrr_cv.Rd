@@ -13,6 +13,10 @@ cca_group_rrr_cv(
   kfolds = 5,
   parallelize = FALSE,
   standardize = FALSE,
+<<<<<<< HEAD
+=======
+  preprocess = NULL,
+>>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
   LW_Sy = TRUE,
   solver = "ADMM",
   rho = 1,
@@ -36,13 +40,22 @@ cca_group_rrr_cv(
 
 \item{kfolds}{Nb of folds for the CV procedure}
 
-\item{standardize}{Whether to scale variables}
+\item{parallelize}{Whether to use parallel processing (default is FALSE)}
 
+<<<<<<< HEAD
+=======
+\item{standardize}{Backward-compatible preprocessing flag: TRUE = \code{"scale"}, FALSE = \code{"center"}.}
+
+\item{preprocess}{Preprocessing mode. One of \code{"scale"} (center + scale), \code{"center"} (center only), or \code{"none"}.}
+
+>>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)}
 
 \item{solver}{Either "ADMM" or "CVXR"}
 
 \item{rho}{ADMM parameter}
+
+\item{thresh_0}{tolerance for declaring entries non-zero}
 
 \item{niter}{Maximum number of ADMM iterations}
 
@@ -50,9 +63,7 @@ cca_group_rrr_cv(
 
 \item{verbose}{Print diagnostics}
 
-\item{Sx}{Optional covariance matrix for X; if NULL computed internally}
-
-\item{Sy}{Optional covariance matrix for Y; if NULL computed internally}
+\item{nb_cores}{Number of cores to use for parallelization (default is all available cores minus 1)}
 }
 \value{
 A list with elements:

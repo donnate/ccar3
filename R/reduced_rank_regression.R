@@ -1,45 +1,63 @@
 # Required libraries
-library(tidyverse)
-library(Matrix)
-library(glmnet)
-library(gglasso)
-library(SMUT)
-library(rrpack)
+library(dplyr)
+library(magrittr)
 library(foreach)
-library(doParallel)
 
-# Helper functions
-compute_sqrt_inv <- function(S, threshold = 1e-4) {
-  svd_S <- svd(S)
-  svd_S$u %*% diag(sapply(svd_S$d, function(x) ifelse(x > threshold, 1 / sqrt(x), 0))) %*% t(svd_S$v)
+
+# Helper: efficient (Sx + rho I)^{-1} * W without forming large Sx when p >> n
+make_invSx_apply <- function(X, Sx, rho, ridge = 1e-8, verbose = FALSE) {
+  p <- ncol(X)
+  if (!is.null(Sx)) {
+    invSx <- solve(Sx + rho * diag(p))
+    return(list(
+      apply = function(W) invSx %*% W,
+      uses_woodbury = FALSE
+    ))
+  }
+
+  n <- nrow(X)
+  if (n < 1 || p < 1) stop("X must have positive dimensions.")
+
+  # Woodbury: (rho I + X'X/n)^{-1} = (1/rho)I - (1/rho^2) X' (I + XX'/(n rho))^{-1} X / n
+  M <- diag(n) + tcrossprod(X) / (n * rho)
+  R <- tryCatch(chol(M + ridge * diag(n)), error = function(e) NULL)
+
+  solve_M <- if (!is.null(R)) {
+    function(B) backsolve(R, forwardsolve(t(R), B))
+  } else {
+    if (verbose) message("Cholesky failed in Woodbury solve; using solve().")
+    function(B) solve(M, B)
+  }
+
+  list(
+    apply = function(W) {
+      XW <- (X %*% W) / n
+      tmp <- solve_M(XW)
+      (1 / rho) * W - (1 / rho^2) * crossprod(X, tmp)
+    },
+    uses_woodbury = TRUE
+  )
 }
 
-compute_sqrt <- function(S, threshold = 1e-4) {
-  svd_S <- svd(S)
-  svd_S$u %*% diag(sapply(svd_S$d, function(x) ifelse(x > threshold, sqrt(x), 0))) %*% t(svd_S$u)
-}
-
-
-matmul = function(A, B){
-  SMUT::eigenMapMatMult(A, B)
-}
 
 
 # Helper: ADMM-based group sparse solver
-solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verbose = FALSE, thresh_0 = 1e-6) {
+solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verbose = FALSE, thresh_0 = 1e-6,
+                           invSx_apply = NULL) {
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
-  Sx_tot <- Sx
-  
-  invSx <- solve(Sx_tot + rho * diag(p))
-  
+
+  if (is.null(invSx_apply)) {
+    invSx_info <- make_invSx_apply(X, Sx, rho, verbose = verbose)
+    invSx_apply <- invSx_info$apply
+  }
+
   U <- Z <- matrix(0, p, q)
   
   prod_xy <- crossprod(X, tilde_Y) / n
-  invSx <- solve(Sx_tot + rho * diag(p))
   for (i in seq_len(niter)) {
     U_old <- U; Z_old <- Z
-    B <- invSx %*% (prod_xy + rho * (Z - U))
+    B <- invSx_apply(prod_xy + rho * (Z - U))
     Z <- B + U
     norm_col <- sqrt(rowSums(Z^2))
     shrinkage <- pmax(0, 1 - (lambda / rho) / norm_col)
@@ -58,6 +76,11 @@ solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verb
 
 # Helper: CVXR-based group sparse solver
 solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
+  if (!requireNamespace("CVXR", quietly = TRUE)) {
+    stop("Package 'CVXR' must be installed to use the CVX solver.",
+         call. = FALSE)
+  }
+
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
   B <- CVXR::Variable(p, q)
@@ -92,12 +115,13 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
 #' @param verbose Logical for verbose output.
 #'
 #' @return A list with elements:
-#' \describe{
-#'   \item{U}{Canonical direction matrix for X (p x r)}
-#'   \item{V}{Canonical direction matrix for Y (q x r)}
-#'   \item{cor}{Canonical covariances}
-#'   \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
+#' \itemize{
+#'   \item U: Canonical direction matrix for X (p x r)
+#'   \item V: Canonical direction matrix for Y (q x r)
+#'   \item cor: Canonical covariances
+#'   \item loss: The prediction error 1/n * || XU - YV ||^2
 #' }
+
 #' @export
 cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                     lambda = 0, 
@@ -117,7 +141,8 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else Y # scale(Y, scale = FALSE)
   
-  if (is.null(Sx)) Sx <- crossprod(X) / n
+  skip_Sx <- highdim && is.null(Sx) && p > n
+  if (is.null(Sx) && !skip_Sx) Sx <- crossprod(X) / n
   if (is.null(Sy)) {
     Sy <- crossprod(Y) / n
     if (LW_Sy) Sy <- as.matrix(corpcor::cov.shrink(Y, verbose=verbose))
@@ -146,6 +171,10 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                               verbose = FALSE)
     } else {
       if(verbose){print("Using gglasso solver")}
+        if (!requireNamespace("rrpack", quietly = TRUE)) {
+          stop("Package 'rrpack' must be installed to use the rrpack solver.",
+              call. = FALSE)
+        }
       fit <- rrpack::cv.srrr(tilde_Y, X, nrank = r, method = "glasso", nfold = 2,
                              modstr = list("lamA" = rep(lambda, 10), "nlam" = 10))
       B_opt <- fit$coef
@@ -154,21 +183,30 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
     B_opt[abs(B_opt) < thresh_0] <- 0
     active_rows <- which(rowSums(B_opt^2) > 0)
     if (length(active_rows) > r - 1) {
-      sqrt_Sx <- compute_sqrt(Sx[active_rows, active_rows])
+      if (is.null(Sx)) {
+        Sx_active <- crossprod(X[, active_rows, drop = FALSE]) / n
+      } else {
+        Sx_active <- Sx[active_rows, active_rows, drop = FALSE]
+      }
+      sqrt_Sx <- compute_sqrt(Sx_active)
       sol <- svd(sqrt_Sx %*% B_opt[active_rows, ])
       V <- sqrt_inv_Sy %*% sol$v[, 1:r]
       inv_D <- diag(sapply(sol$d[1:r], function(d) ifelse(d < 1e-4, 0, 1 / d)))
       U <- B_opt %*% sol$v[, 1:r] %*% inv_D
+      Lambda = sol$d[1:r]
     } else {
       U <- matrix(0, p, r)
       V <- matrix(0, q, r)
+      Lambda <- rep(0, r)
     }
   }
+  XU <- X %*% U
+  YV <- Y %*% V
+
+  cor <- diag(crossprod(XU, YV) / n)
+  loss <- mean((YV - XU)^2)
   
-  loss <- mean((Y %*% V - X %*% U)^2)
-  canon_corr <- sapply(seq_len(r), function(i) stats::cov(X %*% U[, i], Y %*% V[, i]))
-  
-  list(U = U, V = V, loss = loss, cor = canon_corr)
+  list(U = U, V = V, Lambda=Lambda, loss = loss, cor = cor)
 }
 
 
@@ -180,8 +218,6 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' Canonical Correlation Analysis via Reduced Rank Regression (RRR)
 #' @param X Matrix of predictors.
 #' @param Y Matrix of responses.
-#' @param Sx Optional X covariance matrix.
-#' @param Sy Optional Y covariance matrix.
 #' @param r Rank of the solution.
 #' @param kfolds Number of folds for cross-validation.
 #' @param lambdas Sequence of lambda values for cross-validation.
@@ -193,14 +229,16 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
 #' @param verbose Logical for verbose output.
+#' @param thresh_0 tolerance for declaring entries non-zero
+#' @param nb_cores Number of cores to use for parallelization. Defaults to min(kfolds, available cores minus 1).
 #'
 #' @return A list with elements:
-#' \describe{
-#'   \item{U}{Canonical direction matrix for X (p x r)}
-#'   \item{V}{Canonical direction matrix for Y (q x r)}
-#'   \item{lambda}{Optimal regularisation parameter lambda chosen by CV}
-#'   \item{rmse}{Mean squared error of prediction (as computed in the CV)}
-#'   \item{cor}{Canonical correlations}
+#' \itemize{
+#'   \item U: Canonical direction matrix for X (p x r)
+#'   \item V: Canonical direction matrix for Y (q x r)
+#'   \item lambda: Optimal regularisation parameter lambda chosen by CV
+#'   \item rmse: Mean squared error of prediction (as computed in the CV)
+#'   \item cor: Canonical correlations
 #' }
 #' @importFrom foreach foreach %dopar%
 #' @importFrom foreach foreach %do%
@@ -222,9 +260,9 @@ cca_rrr_cv <- function(X, Y,
   X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else Y #scale(Y, scale = FALSE)
   n <- nrow(X)
-  Sx = matmul(t(X), X) / n
+  p <- ncol(X)
+  Sx <- if (p > n) NULL else matmul(t(X), X) / n
   Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose = FALSE)) else crossprod(Y) / n
-  print("got here")
   cv_function <- function(lambda) {
     #print(lambda)
     cca_rrr_cv_folds(X, Y, Sx=Sx, Sy=NULL, kfolds=kfolds, 
@@ -235,12 +273,38 @@ cca_rrr_cv <- function(X, Y,
   }
   
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
+
+    if (!requireNamespace("doParallel", quietly = TRUE)) {
+    stop("Package 'doParallel' must be installed to use the parallelization option.",
+         call. = FALSE)
+    }
+
+    if (!requireNamespace("crayon", quietly = TRUE)) {
+    stop("Package 'crayon' must be installed to use the parallelization option.",
+         call. = FALSE)
+    }
+
     # --- GRACEFUL PARALLEL SETUP ---
-      cl <- setup_parallel_backend(nb_cores)
+      available_cores_str <- Sys.getenv("SLURM_CPUS_PER_TASK")
+      available_cores <- if (available_cores_str == "") {
+        parallel::detectCores()
+      } else {
+        as.integer(available_cores_str)
+      }
+      available_cores <- max(1L, available_cores)
+      if (is.null(nb_cores)) {
+        nb_cores_effective <- min(kfolds, length(lambdas), available_cores - 1L)
+      } else {
+        nb_cores_effective <- min(as.integer(nb_cores), kfolds, length(lambdas))
+      }
+      nb_cores_effective <- max(1L, nb_cores_effective)
+      cl <- setup_parallel_backend(nb_cores_effective)
       
       if (!is.null(cl)) {
         # If the cluster was created successfully, register it and plan to stop it
-        cat(crayon::green("Parallel backend successfully registered.\n"))
+        if (verbose){
+          cat(crayon::green("Parallel backend successfully registered.\n"))
+        }
         doParallel::registerDoParallel(cl)
         on.exit(parallel::stopCluster(cl), add = TRUE)
       } else {
@@ -251,9 +315,22 @@ cca_rrr_cv <- function(X, Y,
    }
 
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
-    resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
+    if (solver  %in% c("CVX", "CVXR" )){
+        if (!requireNamespace("CVXR", quietly = TRUE)) {
+         stop("Package 'CVXR' must be installed to use the CVXR/CVX solver.",
+         call. = FALSE)
+          }
+
+      resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
+
+    }else{
+      resultsx <- foreach(lambda=lambdas, .combine=rbind) %dopar% {
+      data.frame(lambda=lambda, rmse=cv_function(lambda))
+    }
+    }
+    
   } else {
     resultsx <- data.frame(lambda = lambdas)
     resultsx$rmse <- sapply(lambdas, cv_function)
@@ -261,40 +338,32 @@ cca_rrr_cv <- function(X, Y,
   }
   
   resultsx <- resultsx %>% 
-    mutate(rmse = ifelse(is.na(rmse) | rmse == 0, 1e8, rmse)) %>%
-    filter(rmse > 1e-5)
+    dplyr::mutate(rmse = ifelse(is.na(rmse) | rmse == 0, 1e8, rmse)) %>%
+    dplyr::filter(rmse > 1e-5)
   
   opt_lambda <- resultsx$lambda[which.min(resultsx$rmse)]
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
-  print("optimal lambda")
-  
+
   final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, lambda=opt_lambda, r=r,
                    highdim=TRUE, solver=solver,
                    standardize=FALSE, LW_Sy=LW_Sy, rho=rho, niter=niter, 
                    thresh=thresh, thresh_0=thresh_0,verbose=verbose)
-  print("res")
 
-  print(list(U = final$U, 
-             V = final$V,
-             lambda = opt_lambda,
-             #resultsx = resultsx,
-             rmse = resultsx$rmse,
-             cor = sapply(1:r, function(i) stats::cov(X %*% final$U[,i], Y %*% final$V[,i]))
-  ))
+
   return(list(U = final$U, 
        V = final$V,
        lambda = opt_lambda,
-       #resultsx = resultsx,
+       resultsx = resultsx,
        rmse = resultsx$rmse,
-       cor = sapply(1:r, function(i) stats::cov(X %*% final$U[,i], Y %*% final$V[,i]))
+       cor = final$cor,
+       Lambda = final$Lambda,
+       B = final$B_opt
        ))
 }
 
-#' Cross-validation Fold Evaluation for CCA_rrr
-#'
-#' Evaluates a single value of lambda using k-fold CV.
-#'
-#' @return Average RMSE across folds.
+
+
+
 cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                              lambda=0.01,
                              r=2,
@@ -324,7 +393,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
       final <- cca_rrr(X_train, Y_train, Sx=Sx_train, Sy=NULL, highdim=TRUE,
                        lambda=lambda, r=r, solver=solver,
                        LW_Sy=LW_Sy, standardize=FALSE, rho=rho, niter=niter, 
-                       thresh=thresh,thresh_0=thresh_0,
+                       thresh=thresh, thresh_0=thresh_0,
                        verbose=FALSE)
       mean((X_val %*% final$U - Y_val %*% final$V)^2)
     }, error = function(e) {
@@ -336,4 +405,3 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
   if (mean(is.na(rmse)) == 1) return(1e8)
   mean(rmse, na.rm = TRUE)
 }
-

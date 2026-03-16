@@ -25,6 +25,7 @@ test_that("cca_rrr_cv returns correct output structure", {
 })
 
 test_that("cca_rrr_cv can run in parallel", {
+    skip_if_not_installed("doParallel")
   set.seed(123)
   r = 3
   gen = generate_example_sparse_U(n=100, p1=50, p2=10,

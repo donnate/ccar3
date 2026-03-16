@@ -1,9 +1,5 @@
 # LIBRARIES
-library(glmnet)
 library(MASS)
-#library(pls)
-library(CCA)
-
 
 #' Function to perform Sparse CCA based on Wilms and Croux (2018)
 #'  REFERENCE Wilms, I., & Croux, C. (2018). Sparse canonical correlation analysis using alternating regressions. Journal of Computational and Graphical Statistics, 27(1), 1-10.
@@ -18,6 +14,7 @@ library(CCA)
 #' @param B.initial Initial value for the canonical vector B (default is NULL, which uses a canonical ridge solution)
 #' @param max.iter Maximum number of iterations for convergence (default is 20)
 #' @param conv Convergence threshold (default is 1e-2)
+#' @param standardize Standardize (center and scale) the data matrices X and Y (default is TRUE) before analysis
 #' @return A list with elements:
 #' \describe{
 #'   \item{U}{Canonical direction matrix for X (p x r)}

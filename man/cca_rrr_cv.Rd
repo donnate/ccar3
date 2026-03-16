@@ -43,24 +43,30 @@ cca_rrr_cv(
 
 \item{rho}{ADMM parameter.}
 
+\item{thresh_0}{tolerance for declaring entries non-zero}
+
 \item{niter}{Maximum number of iterations for ADMM.}
 
 \item{thresh}{Convergence threshold.}
 
 \item{verbose}{Logical for verbose output.}
 
+<<<<<<< HEAD
 \item{Sx}{Optional X covariance matrix.}
 
 \item{Sy}{Optional Y covariance matrix.}
+=======
+\item{nb_cores}{Number of cores to use for parallelization (default is all available cores minus 1)}
+>>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
 }
 \value{
 A list with elements:
-\describe{
-\item{U}{Canonical direction matrix for X (p x r)}
-\item{V}{Canonical direction matrix for Y (q x r)}
-\item{lambda}{Optimal regularisation parameter lambda chosen by CV}
-\item{rmse}{Mean squared error of prediction (as computed in the CV)}
-\item{cor}{Canonical correlations}
+\itemize{
+\item U: Canonical direction matrix for X (p x r)
+\item V: Canonical direction matrix for Y (q x r)
+\item lambda: Optimal regularisation parameter lambda chosen by CV
+\item rmse: Mean squared error of prediction (as computed in the CV)
+\item cor: Canonical correlations
 }
 }
 \description{

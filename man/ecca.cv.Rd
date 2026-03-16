@@ -10,16 +10,27 @@ ecca.cv(
   lambdas = 0,
   groups = NULL,
   r = 2,
-  standardize = F,
+  standardize = FALSE,
   rho = 1,
   B0 = NULL,
   nfold = 5,
   select = "lambda.min",
   eps = 1e-04,
   maxiter = 500,
+<<<<<<< HEAD
   verbose = F,
   parallel = F,
   nb_cores = NULL
+=======
+  verbose = FALSE,
+  parallel = FALSE,
+  nb_cores = NULL,
+  set_seed_cv = NULL,
+  scoring_method = "mse",
+  cv_use_median = FALSE,
+  dense = TRUE,
+  optimized = FALSE
+>>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
 )
 }
 \arguments{
@@ -32,6 +43,8 @@ ecca.cv(
 \item{groups}{List of index vectors defining groups of predictors}
 
 \item{r}{Target rank}
+
+\item{standardize}{Whether to scale variables}
 
 \item{rho}{ADMM parameter}
 
@@ -49,7 +62,13 @@ ecca.cv(
 
 \item{parallel}{Whether to run cross-validation in parallel}
 
-\item{do.scale}{Whether to scale variables}
+\item{nb_cores}{Number of cores to use for parallel processing (default is NULL, which uses all available cores)}
+
+\item{set_seed_cv}{Optional seed for reproducibility of cross-validation folds (de)}
+
+\item{scoring_method}{Method to score the model during cross-validation, either "mse" (mean squared error) or "trace" (trace of the product of matrices)}
+
+\item{cv_use_median}{Whether to use the median of the cross-validation scores instead of the mean. Default is FALSE.}
 }
 \value{
 A list with elements:

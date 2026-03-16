@@ -14,6 +14,10 @@ cca_graph_rrr(
   lambda = 0,
   r,
   standardize = FALSE,
+<<<<<<< HEAD
+=======
+  preprocess = NULL,
+>>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
   LW_Sy = TRUE,
   rho = 10,
   niter = 10000,
@@ -40,7 +44,9 @@ cca_graph_rrr(
 
 \item{r}{Target rank}
 
-\item{standardize}{Whether to center and scale X and Y (default FALSE = center only)}
+\item{standardize}{Backward-compatible preprocessing flag: TRUE = \code{"scale"}, FALSE = \code{"center"}.}
+
+\item{preprocess}{Preprocessing mode. One of \code{"scale"} (center + scale), \code{"center"} (center only), or \code{"none"}.}
 
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy}
 

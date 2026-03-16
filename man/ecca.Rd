@@ -2,7 +2,7 @@
 % Please edit documentation in R/ecca.r
 \name{ecca}
 \alias{ecca}
-\title{Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensiona;}
+\title{Sparse Canonical Correlation via Reduced-Rank Regression when both X and Y are high-dimensional.}
 \usage{
 ecca(
   X,
@@ -13,12 +13,12 @@ ecca(
   Sy = NULL,
   Sxy = NULL,
   r = 2,
-  standardize = F,
+  standardize = FALSE,
   rho = 1,
   B0 = NULL,
   eps = 1e-04,
   maxiter = 500,
-  verbose = T
+  verbose = TRUE
 )
 }
 \arguments{
@@ -29,6 +29,12 @@ ecca(
 \item{lambda}{Regularization parameter}
 
 \item{groups}{List of index vectors defining groups of predictors}
+
+\item{Sx}{precomputed covariance matrix for X (optional)}
+
+\item{Sy}{precomputed covariance matrix for Y (optional)}
+
+\item{Sxy}{precomputed covariance matrix between X and Y (optional)}
 
 \item{r}{Target rank}
 
