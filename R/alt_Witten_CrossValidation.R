@@ -27,6 +27,9 @@ Witten.CV<-function(X,Y,n.cv=5,
   if (standardize){
     X = scale(X, center = TRUE, scale=TRUE)
     Y = scale(Y, center = TRUE, scale=TRUE)
+  }else{
+    X = scale(X, center = TRUE, scale=FALSE)
+    Y = scale(Y, center = TRUE, scale=FALSE)
   }
   
   cvscore<-array(NA,c(length(lambday),length(lambdax),n.cv)) #lambdax in columns, lambday in rows
@@ -53,6 +56,10 @@ Witten.CV<-function(X,Y,n.cv=5,
 
   ### OUTPUT
   out<-list(lambdax.opt=lambdax.opt,lambday.opt=lambday.opt)
+  Fit.Witten<-PMA::CCA(x=X,z=Y,
+                       typex="standard",typez="standard",K=1,penaltyx=lambdax.opt,penaltyz=lambday.opt,
+                       trace=F)
+
 }
 
 
@@ -61,9 +68,10 @@ Witten.cv.lambdax<-function(U,Xtrain,Ytrain,Xtest,Ytest,lambday){ #AUXILIARY FUN
   return(testcorrelations)
 }
 
-Witten.cv.lambday<-function(V,Xtrain,Ytrain,Xtest,Ytest,lambdaxfixed){ #AUXILIARY FUNCTION
+Witten.cv.lambday<-function(V,Xtrain,Ytrain,Xtest,Ytest,
+                            lambdaxfixed, r=1){ #AUXILIARY FUNCTION
   #print(lambdaxfixed)
-  Fit.Witten<-PMA::CCA(x=Xtrain,z=Ytrain,typex="standard",typez="standard",K=1,penaltyx=lambdaxfixed,penaltyz=V,trace=F)
-  return(abs(cor(Xtest%*%Fit.Witten$u, Ytest%*%Fit.Witten$v)))
+  Fit.Witten<-PMA::CCA(x=Xtrain,z=Ytrain,typex="standard",typez="standard",K=r,penaltyx=lambdaxfixed,penaltyz=V,trace=F)
+  return(sum(diag(abs(cor(Xtest%*%Fit.Witten$u, Ytest%*%Fit.Witten$v)))))
 }  
 

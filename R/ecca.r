@@ -835,9 +835,14 @@ ecca_across_lambdas <- function(
       if (scoring_method == "mse") {
         out_scores[t] <- mean((XU_val - YV_val)^2)
       } else {
-        #
-        #out_scores[t] <- -sum(diag(crossprod(XU_val, YV_val))) / nrow(X_val)
-        out_scores[t] = -mean(diag(cor(XU_val, YV_val)))
+        # Faster than cor(): compute only paired (diagonal) correlations.
+        XUc <- scale(XU_val, center = TRUE, scale = FALSE)
+        YVc <- scale(YV_val, center = TRUE, scale = FALSE)
+        num <- colSums(XUc * YVc)
+        den <- sqrt(colSums(XUc^2) * colSums(YVc^2))
+        den[den < 1e-12 | !is.finite(den)] <- 1e-12
+        corr_diag <- num / den
+        out_scores[t] <- -mean(corr_diag)
       }
     } else {
       out_scores[t] <- NA_real_
@@ -1193,19 +1198,22 @@ ecca.cv <- function(
 
   if (verbose) cat("\nselected lambda:", lambda.opt, "\n")
 
-  final_verbose <- verbose || (length(lambdas) > 1)
-  if (final_verbose) cat("\nRefitting at selected lambda with ADMM logs...\n")
+  final_verbose <- TRUE
+  cat("\nRefitting at selected lambda with ADMM logs...\n")
+  flush.console()
 
   fit <- ecca_across_lambdas(
     X, Y, lambdas = lambda.opt, groups = groups, r = r,
     standardize = standardize,
     rho = rho, B0 = B0, eps = eps, maxiter = maxiter, verbose = final_verbose,
-    admm_print_every = 10L,
+    admm_print_every = 1L,
     lambda_print = TRUE,
     epsilon_sv = epsilon_sv, ridge_whiten = ridge_whiten,
     preprocess = TRUE,
     return_uv = TRUE
   )
+  cat("\nFinal ADMM refit completed.\n")
+  flush.console()
 
   out <- list(
     U = fit$U,

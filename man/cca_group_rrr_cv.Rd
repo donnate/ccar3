@@ -13,6 +13,7 @@ cca_group_rrr_cv(
   kfolds = 5,
   parallelize = FALSE,
   standardize = FALSE,
+  preprocess = NULL,
   LW_Sy = TRUE,
   solver = "ADMM",
   rho = 1,
@@ -38,7 +39,9 @@ cca_group_rrr_cv(
 
 \item{parallelize}{Whether to use parallel processing (default is FALSE)}
 
-\item{standardize}{Whether to scale variables}
+\item{standardize}{Backward-compatible preprocessing flag: TRUE = \code{"scale"}, FALSE = \code{"center"}.}
+
+\item{preprocess}{Preprocessing mode. One of \code{"scale"} (center + scale), \code{"center"} (center only), or \code{"none"}.}
 
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)}
 

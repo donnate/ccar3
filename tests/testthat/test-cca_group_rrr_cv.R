@@ -79,4 +79,23 @@ test_that("cca_group_rrr_cv returns the correct answer", {
   expect_true(subdistance(result$V, gen$v) < 0.35)
 })
 
+test_that("cca_group_rrr_cv supports preprocess modes and p > n", {
+  set.seed(42)
+  n <- 50
+  p <- 100
+  q <- 5
+  r <- 2
+  X <- matrix(rnorm(n * p), n, p)
+  Y <- matrix(rnorm(n * q), n, q)
+  groups <- split(seq_len(p), ceiling(seq_len(p) / 5))
+
+  result <- cca_group_rrr_cv(
+    X, Y, groups = groups, r = r,
+    kfolds = 3, parallelize = FALSE, lambdas = c(0.001, 0.01),
+    preprocess = "center", LW_Sy = FALSE, niter = 300
+  )
+
+  expect_type(result, "list")
+  expect_true(all(c("U", "V", "lambda", "rmse", "cor") %in% names(result)))
+})
 

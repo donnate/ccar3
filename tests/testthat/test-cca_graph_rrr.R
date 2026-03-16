@@ -56,3 +56,29 @@ test_that("cca_graph returns the correct answer", {
   
 })
 
+test_that("cca_graph_rrr accepts sparse Gamma and preprocessing modes", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("Matrix")
+
+  set.seed(123)
+  r <- 2
+  gen <- generate_example_graph(
+    n = 300, p1 = 10, p2 = 5,
+    r_pca = 3,
+    nnzeros = 5,
+    theta = diag(c(0.9, 0.8)),
+    lambda_pca = 1,
+    r = r, overlapping_amount = 1,
+    normalize_diagonal = TRUE,
+    n_new = 1000
+  )
+
+  Gamma_sparse <- Matrix::Matrix(gen$Gamma, sparse = TRUE)
+  res_none <- cca_graph_rrr(gen$X, gen$Y, Gamma = Gamma_sparse, lambda = 0.02, r = r, preprocess = "none")
+  res_center <- cca_graph_rrr(gen$X, gen$Y, Gamma = Gamma_sparse, lambda = 0.02, r = r, preprocess = "center")
+  res_scale <- cca_graph_rrr(gen$X, gen$Y, Gamma = Gamma_sparse, lambda = 0.02, r = r, preprocess = "scale")
+
+  expect_equal(dim(res_none$U), c(ncol(gen$X), r))
+  expect_equal(dim(res_center$U), c(ncol(gen$X), r))
+  expect_equal(dim(res_scale$U), c(ncol(gen$X), r))
+})

@@ -84,3 +84,25 @@ test_that("cca_group computes the same solutions across solvers", {
   expect_true(subdistance(result1$V, gen$v) <0.35)
   expect_true(subdistance(result2$V, gen$v) <0.35)
 })
+
+test_that("cca_group_rrr supports preprocess modes and p > n", {
+  set.seed(42)
+  n <- 40
+  p <- 80
+  q <- 5
+  r <- 2
+  X <- matrix(rnorm(n * p), n, p)
+  Y <- matrix(rnorm(n * q), n, q)
+  groups <- split(seq_len(p), ceiling(seq_len(p) / 5))
+
+  fit_none <- cca_group_rrr(X, Y, groups = groups, r = r, lambda = 0.01,
+                            preprocess = "none", LW_Sy = FALSE, niter = 300)
+  fit_center <- cca_group_rrr(X, Y, groups = groups, r = r, lambda = 0.01,
+                              preprocess = "center", LW_Sy = FALSE, niter = 300)
+  fit_scale <- cca_group_rrr(X, Y, groups = groups, r = r, lambda = 0.01,
+                             preprocess = "scale", LW_Sy = FALSE, niter = 300)
+
+  expect_equal(dim(fit_none$U), c(p, r))
+  expect_equal(dim(fit_center$U), c(p, r))
+  expect_equal(dim(fit_scale$U), c(p, r))
+})

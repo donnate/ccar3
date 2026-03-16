@@ -80,3 +80,30 @@ test_that("cca_graph_rrr_cv returns the correct answer", {
   expect_true(subdistance(result$U, gen$u) < 0.5)  
   expect_true(subdistance(result$V, gen$v) < 0.5)
 })
+
+test_that("cca_graph_rrr_cv accepts preprocessing mode and sparse Gamma", {
+  skip_if_not_installed("igraph")
+  skip_if_not_installed("Matrix")
+
+  set.seed(42)
+  r <- 2
+  gen <- generate_example_graph(
+    n = 250, p1 = 10, p2 = 5,
+    r_pca = 3,
+    nnzeros = 5,
+    theta = diag(c(0.9, 0.8)),
+    lambda_pca = 1,
+    r = r, overlapping_amount = 1,
+    normalize_diagonal = TRUE,
+    n_new = 1000
+  )
+
+  Gamma_sparse <- Matrix::Matrix(gen$Gamma, sparse = TRUE)
+  result <- cca_graph_rrr_cv(
+    gen$X, gen$Y, Gamma = Gamma_sparse, r = r,
+    kfolds = 3, parallelize = FALSE, preprocess = "center"
+  )
+
+  expect_type(result, "list")
+  expect_true(all(c("U", "V", "lambda", "rmse", "cor") %in% names(result)))
+})
