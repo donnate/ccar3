@@ -19,7 +19,8 @@ cca_graph_rrr_cv(
   thresh = 1e-04,
   thresh_0 = 1e-06,
   verbose = FALSE,
-  Gamma_dagger = NULL
+  Gamma_dagger = NULL,
+  nb_cores = NULL
 )
 }
 \arguments{

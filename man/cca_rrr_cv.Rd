@@ -18,7 +18,8 @@ cca_rrr_cv(
   thresh_0 = 1e-06,
   niter = 10000,
   thresh = 1e-04,
-  verbose = FALSE
+  verbose = FALSE,
+  nb_cores = NULL
 )
 }
 \arguments{

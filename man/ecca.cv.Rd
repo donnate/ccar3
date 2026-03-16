@@ -18,7 +18,8 @@ ecca.cv(
   eps = 1e-04,
   maxiter = 500,
   verbose = F,
-  parallel = F
+  parallel = F,
+  nb_cores = NULL
 )
 }
 \arguments{
