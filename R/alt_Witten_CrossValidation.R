@@ -57,7 +57,7 @@ Witten.CV<-function(X,Y,n.cv=5,
   ### OUTPUT
   out<-list(lambdax.opt=lambdax.opt,lambday.opt=lambday.opt)
   Fit.Witten<-PMA::CCA(x=X,z=Y,
-                       typex="standard",typez="standard",K=1,penaltyx=lambdax.opt,penaltyz=lambday.opt,
+                       typex="standard",typez="standard",K=r,penaltyx=lambdax.opt,penaltyz=lambday.opt,
                        trace=F)
 
 }
