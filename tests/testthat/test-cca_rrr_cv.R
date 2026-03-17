@@ -17,11 +17,13 @@ test_that("cca_rrr_cv returns correct output structure", {
   result <- cca_rrr_cv(X, Y, r = r, kfolds=3, parallelize = FALSE)
   
   expect_type(result, "list")
-  expect_true(all(c("U", "V", "rmse", "lambda", "cor") %in% names(result)))
+  expect_true(all(c("U", "V", "rmse", "lambda", "cor", "cv_summary", "cv_folds", "fit") %in% names(result)))
   expect_equal(dim(result$U)[2], r)
   expect_equal(dim(result$V)[2], r)
   expect_equal(dim(result$U)[1], 50)
   expect_equal(dim(result$V)[1], 10)
+  expect_true(all(c("lambda", "rmse", "se") %in% names(result$cv_summary)))
+  expect_true(all(c("lambda", "fold", "rmse") %in% names(result$cv_folds)))
 })
 
 test_that("cca_rrr_cv can run in parallel", {
@@ -42,7 +44,7 @@ test_that("cca_rrr_cv can run in parallel", {
   result <- cca_rrr_cv(X, Y, r = r, kfolds=3, parallelize = TRUE)
   
   expect_type(result, "list")
-  expect_true(all(c("U", "V", "rmse", "lambda", "cor") %in% names(result)))
+  expect_true(all(c("U", "V", "rmse", "lambda", "cor", "cv_summary", "cv_folds", "fit") %in% names(result)))
   expect_equal(dim(result$U)[2], r)
   expect_equal(dim(result$V)[2], r)
   expect_equal(dim(result$U)[1], 50)
@@ -75,8 +77,9 @@ test_that("cca_rrr_cv returns the correct answer", {
   expect_true(subdistance(result$V, gen$v) < 0.2)
   expect_equal(dim(result$U)[2], r)
   expect_equal(dim(result$V)[2], r)
+  expect_true(nrow(result$cv_summary) > 0)
+  expect_true(nrow(result$cv_folds) > 0)
 })
-
 
 
 

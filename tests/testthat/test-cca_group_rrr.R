@@ -106,3 +106,26 @@ test_that("cca_group_rrr supports preprocess modes and p > n", {
   expect_equal(dim(fit_center$U), c(p, r))
   expect_equal(dim(fit_scale$U), c(p, r))
 })
+
+test_that("cca_group_rrr supports matrix-free ADMM solves", {
+  set.seed(7)
+  n <- 50
+  p <- 70
+  q <- 4
+  r <- 2
+  X <- matrix(rnorm(n * p), n, p)
+  Y <- matrix(rnorm(n * q), n, q)
+  groups <- split(seq_len(p), ceiling(seq_len(p) / 5))
+
+  fit <- cca_group_rrr(
+    X, Y, groups = groups, r = r, lambda = 0.01,
+    preprocess = "center", LW_Sy = FALSE, niter = 200,
+    matrix_free_threshold = 1L,
+    cg_tol = 1e-5,
+    cg_maxiter = 50
+  )
+
+  expect_equal(dim(fit$U), c(p, r))
+  expect_equal(dim(fit$V), c(q, r))
+  expect_true(all(is.finite(fit$cor)))
+})

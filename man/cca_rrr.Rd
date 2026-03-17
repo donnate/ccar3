@@ -15,6 +15,7 @@ cca_rrr(
   solver = "ADMM",
   LW_Sy = TRUE,
   standardize = TRUE,
+  preprocess = TRUE,
   rho = 1,
   niter = 10000,
   thresh = 1e-04,
@@ -44,7 +45,9 @@ cca_rrr(
 
 \item{LW_Sy}{Whether to use Ledoit-Wolf shrinkage for Sy.}
 
-\item{standardize}{Logical; should X and Y be scaled.}
+\item{standardize}{Logical; should X and Y be centered and scaled. If FALSE, they are centered but not scaled.}
+
+\item{preprocess}{Logical; should \code{cca_rrr()} preprocess \code{X} and \code{Y} internally? Set to \code{FALSE} when data have already been centered/scaled upstream.}
 
 \item{rho}{ADMM parameter.}
 

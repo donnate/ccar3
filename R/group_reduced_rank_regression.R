@@ -37,31 +37,27 @@ library(foreach)
 
 
 # Helper: ADMM-based group sparse solver
-solve_group_rrr_admm <- function(X, tilde_Y, groups, lambda, Sx = NULL, use_low_rank = FALSE,
-                                 rho=1, niter=1e4, 
-                                 thresh=0.00001, thresh_0=1e-6, verbose = FALSE) {
+solve_group_rrr_admm <- function(X, tilde_Y, groups, lambda, Sx = NULL,
+                                 rho = 1, niter = 1e4,
+                                 thresh = 0.00001, thresh_0 = 1e-6, verbose = FALSE,
+                                 invSx_apply = NULL,
+                                 matrix_free_threshold = 4000L,
+                                 cg_tol = 1e-6,
+                                 cg_maxiter = NULL) {
   n <- nrow(X)
   p <- ncol(X)
   q <- ncol(tilde_Y)
-  prod_xy <- matmul(t(X), tilde_Y)/ nrow(X)
+  prod_xy <- crossprod(X, tilde_Y) / n
 
-  if (use_low_rank) {
-    Ux <- X / sqrt(n)
-    K <- diag(n) + (1 / rho) * tcrossprod(Ux)
-    K_chol <- chol(K)
-
-    invSx_mul <- function(M) {
-      UM <- Ux %*% M
-      tmp <- forwardsolve(t(K_chol), UM)
-      corr <- backsolve(K_chol, tmp)
-      (1 / rho) * M - (1 / (rho^2)) * crossprod(Ux, corr)
-    }
-  } else {
-    if (is.null(Sx)) {
-      Sx <- crossprod(X) / n
-    }
-    invSx <- solve(Sx + rho * diag(p))
-    invSx_mul <- function(M) invSx %*% M
+  if (is.null(invSx_apply)) {
+    invSx_info <- make_invSx_apply(
+      X, Sx, rho, verbose = verbose,
+      matrix_free_threshold = matrix_free_threshold,
+      cg_tol = cg_tol,
+      cg_maxiter = cg_maxiter
+    )
+    invSx_apply <- invSx_info$apply
+    if (verbose) message("ADMM linear solver strategy: ", invSx_info$strategy)
   }
   
   U <- matrix(0, p, q)
@@ -69,7 +65,7 @@ solve_group_rrr_admm <- function(X, tilde_Y, groups, lambda, Sx = NULL, use_low_
   
   for (i in seq_len(niter)) {
     U_old <- U; Z_old <- Z
-    B <- invSx_mul(prod_xy + rho * (Z - U))
+    B <- invSx_apply(prod_xy + rho * (Z - U))
     Z <- B + U
     
     for (g in seq_along(groups)) {
@@ -104,7 +100,7 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
 
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
-  B <- CVXR::Variable(p, q)
+  B <- CVXR::Variable(c(p, q))
   
   penalty_exprs <- lapply(groups, function(g) {
     CVXR::norm(B[g, , drop = FALSE], "F")
@@ -116,9 +112,9 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
   )
   
   prob <- CVXR::Problem(objective)
-  res <- CVXR::solve(prob)
-  
-  B_opt <- res$getValue(B)
+  res <- CVXR::psolve(prob)
+
+  B_opt <- CVXR::value(B)
   B_opt[abs(B_opt) < thresh_0] <- 0
   return(B_opt)
 }
@@ -145,6 +141,9 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
 #' @param niter Maximum number of ADMM iterations
 #' @param thresh Convergence threshold for ADMM
 #' @param thresh_0 tolerance for declaring entries non-zero
+#' @param matrix_free_threshold For ADMM: when both `n` and `p` are at least this value, use a matrix-free conjugate-gradient solve instead of forming a dense linear system.
+#' @param cg_tol Relative tolerance for the matrix-free conjugate-gradient solve used in ADMM.
+#' @param cg_maxiter Maximum iterations for the matrix-free conjugate-gradient solve. Defaults to `min(p, 1000)`.
 #' @param verbose Print diagnostics
 #'
 #' @return A list with elements:
@@ -153,6 +152,8 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
 #'   \item{V}{Canonical direction matrix for Y (q x r)}
 #'   \item{cor}{Canonical covariances}
 #'   \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
+#'   \item{Lambda}{Canonical correlations}
+#'   \item{B_opt}{Estimated reduced-rank coefficient matrix}
 #' }
 #' @export
 cca_group_rrr <- function(X, Y, groups, 
@@ -161,7 +162,11 @@ cca_group_rrr <- function(X, Y, groups,
                           standardize = FALSE,
                           preprocess = NULL,
                           LW_Sy = TRUE, solver = "ADMM",
-                          rho = 1, niter = 1e4, thresh = 1e-4, thresh_0=1e-6, verbose = FALSE) {
+                          rho = 1, niter = 1e4, thresh = 1e-4, thresh_0=1e-6,
+                          matrix_free_threshold = 4000L,
+                          cg_tol = 1e-6,
+                          cg_maxiter = NULL,
+                          verbose = FALSE) {
   preprocess_mode <- .resolve_group_preprocess_mode(standardize = standardize, preprocess = preprocess)
   X <- .preprocess_group_matrix(X, preprocess_mode)
   Y <- .preprocess_group_matrix(Y, preprocess_mode)
@@ -171,16 +176,6 @@ cca_group_rrr <- function(X, Y, groups,
   q <- ncol(Y)
   
   if (n < min(p, q)) warning("Both X and Y are high-dimensional; method may be unstable.")
-
-  sx_svd <- NULL
-  if (is.null(Sx)) {
-    if (p > n) {
-      # For p > n, avoid explicitly constructing p x p covariance.
-      sx_svd <- svd(X / sqrt(n))
-    } else {
-      Sx <- crossprod(X) / n
-    }
-  }
 
   if (is.null(Sy)) {
     Sy <- crossprod(Y) / n
@@ -193,32 +188,30 @@ cca_group_rrr <- function(X, Y, groups,
   
   B_opt <- switch(solver,
                   "ADMM" = solve_group_rrr_admm(X, tilde_Y, groups=groups, lambda=lambda,
-                                                Sx = Sx, use_low_rank = !is.null(sx_svd),
+                                                Sx = Sx,
                                                 rho=rho, niter=niter, 
-                                                thresh=thresh, thresh_0=thresh_0, verbose=verbose),
+                                                thresh=thresh, thresh_0=thresh_0, verbose=verbose,
+                                                matrix_free_threshold = matrix_free_threshold,
+                                                cg_tol = cg_tol,
+                                                cg_maxiter = cg_maxiter),
                   "CVXR" = solve_group_rrr_cvxr(X, tilde_Y, groups, lambda, thresh_0=thresh_0),
                   stop("Unsupported solver: choose either 'ADMM' or 'CVXR'")
   )
-  
-  if (!is.null(sx_svd)) {
-    sqrt_Sx_B <- sx_svd$v %*% (sx_svd$d * crossprod(sx_svd$v, B_opt))
-  } else {
-    svd_Sx <- svd(as.matrix(Sx))
-    sqrt_Sx_B <- svd_Sx$u %*% (sqrt(pmax(svd_Sx$d, 0)) * crossprod(svd_Sx$u, B_opt))
-  }
-  
-  sol <- svd(sqrt_Sx_B)
-  V <- sqrt_inv_Sy %*% sol$v[, 1:r]
-  inv_D <- diag(ifelse(sol$d[1:r] > 1e-4, 1 / sol$d[1:r], 0))
-  U <- B_opt %*% sol$v[, 1:r] %*% inv_D
-  
-  loss <- mean((Y %*% V - X %*% U)^2)
-  
+
+  post <- .postprocess_rrr_fit(
+    B_opt, X, Y, sqrt_inv_Sy, r,
+    ridge_whiten = max(thresh_0, 1e-8),
+    thresh_0 = thresh_0,
+    verbose = verbose
+  )
+
   list(
-    U = U,
-    V = V,
-    loss = loss,
-    cor = sapply(1:r, function(i) cov(X %*% U[, i], Y %*% V[, i]))
+    U = post$U,
+    V = post$V,
+    loss = post$loss,
+    cor = post$cor,
+    Lambda = post$Lambda,
+    B_opt = B_opt
   )
 }
 
@@ -227,22 +220,22 @@ cca_group_rrr <- function(X, Y, groups,
 # Cross-validated loss for group-penalized CCA
 cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 5, 
                                    lambda = 0.01, r = 2, 
-                                   standardize = FALSE, preprocess = NULL,
+                                   preprocess = NULL,
                                    LW_Sy = FALSE, solver = "ADMM", 
                                    rho = 1, niter = 1e4, thresh = 1e-4,
-                                   thresh_0=1e-6, 
-                                   verbose = FALSE) {
-  preprocess_mode <- .resolve_group_preprocess_mode(standardize = standardize, preprocess = preprocess)
-  folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
-  if (solver == "CVXR"){
-    if (!requireNamespace("CVXR", quietly = TRUE)) {
-       stop("Package 'CVXR' must be installed to use the CVXR solver.", call. = FALSE)
-    }
-    packages_list <- c("CVXR", "Matrix")
-  } else {
-    packages_list <- c()
+                                   thresh_0 = 1e-6,
+                                   matrix_free_threshold = 4000L,
+                                   cg_tol = 1e-6,
+                                   cg_maxiter = NULL,
+                                   verbose = FALSE,
+                                   folds = NULL,
+                                   return_fold_values = FALSE) {
+  preprocess_mode <- .resolve_group_preprocess_mode(standardize = NULL, preprocess = preprocess)
+  if (is.null(folds)) {
+    folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   }
-  rmse <- foreach(i = seq_along(folds), .combine = c, .packages = packages_list) %do% {
+
+  rmse <- vapply(seq_along(folds), function(i) {
     n <- nrow(X)
     X_train <- X[-folds[[i]], ]; Y_train <- Y[-folds[[i]], ]
     X_val <- X[folds[[i]], ]; Y_val <- Y[folds[[i]], ]
@@ -253,21 +246,31 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
     } else {
       Sx_train <- NULL
     }
-    
-    
+
+    if (!is.null(Sy)) {
+      Sy_train <- (n * Sy - crossprod(Y_val)) / n_train
+    } else {
+      Sy_train <- NULL
+    }
+
     tryCatch({
-      fit <- cca_group_rrr(X_train, Y_train, groups, Sx = Sx_train, Sy = NULL,
+      fit <- cca_group_rrr(X_train, Y_train, groups, Sx = Sx_train, Sy = Sy_train,
                            lambda = lambda, r = r, 
-                           standardize = standardize, preprocess = preprocess_mode,
+                           standardize = FALSE, preprocess = preprocess_mode,
                            LW_Sy = LW_Sy, solver = solver,
-                           rho = rho, niter = niter, thresh = thresh, thresh_0=thresh_0,verbose = FALSE)
+                           rho = rho, niter = niter, thresh = thresh, thresh_0 = thresh_0,
+                           matrix_free_threshold = matrix_free_threshold,
+                           cg_tol = cg_tol,
+                           cg_maxiter = cg_maxiter,
+                           verbose = FALSE)
       mean((X_val %*% fit$U - Y_val %*% fit$V)^2)
     }, error = function(e) {
       message("Error in fold ", i, ": ", conditionMessage(e))
-      return(NA)
+      NA_real_
     })
-  }
+  }, numeric(1))
   
+  if (return_fold_values) return(rmse)
   if (all(is.na(rmse))) return(1e8)
   mean(rmse, na.rm = TRUE)
 }
@@ -293,6 +296,9 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 #' @param thresh Convergence threshold for ADMM
 #' @param verbose Print diagnostics
 #' @param thresh_0 tolerance for declaring entries non-zero
+#' @param matrix_free_threshold For ADMM: when both `n` and `p` are at least this value, use a matrix-free conjugate-gradient solve instead of forming a dense linear system.
+#' @param cg_tol Relative tolerance for the matrix-free conjugate-gradient solve used in ADMM.
+#' @param cg_maxiter Maximum iterations for the matrix-free conjugate-gradient solve. Defaults to `min(p, 1000)`.
 #' @param nb_cores Number of cores to use for parallelization (default is all available cores minus 1)
 #'
 #' @return A list with elements:
@@ -302,6 +308,9 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 #'   \item{lambda}{Optimal regularisation parameter lambda chosen by CV}
 #'   \item{rmse}{Mean squared error of prediction (as computed in the CV)}
 #'   \item{cor}{Canonical covariances}
+#'   \item{cv_summary}{Data frame with one row per lambda containing mean RMSE and its foldwise standard error}
+#'   \item{cv_folds}{Data frame with fold-level RMSE values for each lambda}
+#'   \item{fit}{Final fit at the selected lambda}
 #' }
 #' @importFrom foreach foreach %dopar%
 #' @export
@@ -310,8 +319,12 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
                              kfolds = 5, parallelize = FALSE, standardize = FALSE,
                              preprocess = NULL,
                              LW_Sy = TRUE, solver = "ADMM", rho = 1,
-                             thresh_0 = 1e-6,
-                             niter = 1e4, thresh = 1e-4, verbose = FALSE,
+                             thresh_0 = 0,
+                             niter = 1e4, thresh = 1e-4,
+                             matrix_free_threshold = 4000L,
+                             cg_tol = 1e-6,
+                             cg_maxiter = NULL,
+                             verbose = FALSE,
                              nb_cores = NULL) {
   preprocess_mode <- .resolve_group_preprocess_mode(standardize = standardize, preprocess = preprocess)
   
@@ -324,16 +337,64 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
   Y <- .preprocess_group_matrix(Y, preprocess_mode)
   
   n <- nrow(X)
-  Sx <- if (ncol(X) > n) NULL else crossprod(X) / n
-  #Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose=verbose )) else t(Y) %*% Y / nrow(Y)
+  Sx <- NULL
+  Sy <- if (LW_Sy) NULL else crossprod(Y) / n
+
+  # Rebind the current source definitions into a local environment so PSOCK
+  # workers use the updated functions rather than any stale installed copy.
+  .rrr_cg_solve <- .rrr_cg_solve
+  .rrr_chol_jitter <- .rrr_chol_jitter
+  .rrr_invsqrt_psd <- .rrr_invsqrt_psd
+  .rrr_whiten_factor <- .rrr_whiten_factor
+  .rrr_safe_rank_svd <- .rrr_safe_rank_svd
+  make_invSx_apply <- make_invSx_apply
+  .postprocess_rrr_fit <- .postprocess_rrr_fit
+  .resolve_group_preprocess_mode <- .resolve_group_preprocess_mode
+  .preprocess_group_matrix <- .preprocess_group_matrix
+  solve_group_rrr_admm <- solve_group_rrr_admm
+  solve_group_rrr_cvxr <- solve_group_rrr_cvxr
+  cca_group_rrr <- cca_group_rrr
+  cca_group_rrr_cv_folds <- cca_group_rrr_cv_folds
+  safe_mean_na <- .safe_mean_na
+  safe_sd_na <- .safe_sd_na
+  environment(make_invSx_apply) <- environment()
+  environment(.postprocess_rrr_fit) <- environment()
+  environment(solve_group_rrr_admm) <- environment()
+  environment(solve_group_rrr_cvxr) <- environment()
+  environment(cca_group_rrr) <- environment()
+  environment(cca_group_rrr_cv_folds) <- environment()
   
   run_cv <- function(lambda) {
-    rmse <- cca_group_rrr_cv_folds(X, Y, groups, Sx = Sx, Sy = NULL, kfolds = kfolds,
-                                   lambda = lambda, r = r, 
-                                   preprocess = "none", LW_Sy = LW_Sy, solver = solver,
-                                   rho = rho, niter = niter, thresh = thresh, thresh_0 = thresh_0)
-    data.frame(lambda = lambda, rmse = rmse)
+    fold_values <- cca_group_rrr_cv_folds(
+      X, Y, groups, Sx = Sx, Sy = Sy, kfolds = kfolds,
+      lambda = lambda, r = r,
+      preprocess = "none",
+      LW_Sy = LW_Sy, solver = solver,
+      rho = rho, niter = niter, thresh = thresh, thresh_0 = thresh_0,
+      matrix_free_threshold = matrix_free_threshold,
+      cg_tol = cg_tol,
+      cg_maxiter = cg_maxiter,
+      folds = folds,
+      return_fold_values = TRUE
+    )
+
+    list(
+      summary = data.frame(
+        lambda = lambda,
+        rmse = safe_mean_na(fold_values),
+        se = safe_sd_na(fold_values) / sqrt(sum(!is.na(fold_values))),
+        stringsAsFactors = FALSE
+      ),
+      fold = data.frame(
+        lambda = lambda,
+        fold = seq_along(fold_values),
+        rmse = fold_values,
+        stringsAsFactors = FALSE
+      )
+    )
   }
+
+  folds <- caret::createFolds(1:n, k = kfolds, list = TRUE)
   
     if (parallelize) {
       if (!requireNamespace("doParallel", quietly = TRUE)) {
@@ -367,27 +428,55 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
    if (parallelize) {
 
 
-    results <- foreach(lambda = lambdas, .combine = rbind, .packages = c( "Matrix")) %dopar% run_cv(lambda)
+    parallel_packages <- if (solver == "CVXR") c("Matrix", "CVXR") else c("Matrix")
+    results_list <- foreach(
+      lambda = lambdas,
+      .packages = parallel_packages,
+      .export = c(
+        "cca_group_rrr_cv_folds", "cca_group_rrr",
+        "solve_group_rrr_admm", "solve_group_rrr_cvxr",
+        "make_invSx_apply", ".rrr_cg_solve", ".rrr_chol_jitter",
+        ".rrr_invsqrt_psd", ".rrr_whiten_factor", ".rrr_safe_rank_svd",
+        ".postprocess_rrr_fit", ".resolve_group_preprocess_mode",
+        ".preprocess_group_matrix", ".safe_mean_na", ".safe_sd_na"
+      )
+    ) %dopar% run_cv(lambda)
   } else {
-    results <- purrr::map_dfr(lambdas, run_cv)
+    results_list <- lapply(lambdas, run_cv)
   }
   
-  results$rmse[is.na(results$rmse) | results$rmse == 0] <- 1e8
-  results <- results %>% dplyr::filter(rmse > 1e-5)
+  cv_summary <- dplyr::bind_rows(lapply(results_list, `[[`, "summary"))
+  cv_folds <- dplyr::bind_rows(lapply(results_list, `[[`, "fold"))
+
+  cv_summary$rmse[is.na(cv_summary$rmse) | cv_summary$rmse == 0] <- 1e8
+  cv_summary <- cv_summary %>% dplyr::filter(rmse > 1e-5)
   
-  opt_lambda <- results$lambda[which.min(results$rmse)]
+  opt_lambda <- cv_summary$lambda[which.min(cv_summary$rmse)]
   if (is.na(opt_lambda)) opt_lambda <- 0.1
   
-  final <- cca_group_rrr(X, Y, groups, Sx = Sx, Sy = NULL, lambda = opt_lambda,
+  final <- cca_group_rrr(X, Y, groups, Sx = Sx, Sy = Sy, lambda = opt_lambda,
                          r = r, preprocess = "none", thresh = thresh, thresh_0 = thresh_0,
-                         LW_Sy = LW_Sy, solver = solver, rho = rho, niter = niter, verbose=verbose)
+                         LW_Sy = LW_Sy, solver = solver, rho = rho, niter = niter,
+                         matrix_free_threshold = matrix_free_threshold,
+                         cg_tol = cg_tol,
+                         cg_maxiter = cg_maxiter,
+                         verbose=verbose)
   
   list(
     U = final$U,
     V = final$V,
     lambda = opt_lambda,
-    #resultsx = results,
-    rmse = results$rmse,
-    cor = sapply(1:r, function(i) cov(X %*% final$U[, i], Y %*% final$V[, i]))
+    rmse = cv_summary$rmse,
+    cor = final$cor,
+    lambda_x = opt_lambda,
+    lambda_x_se = cv_summary$se[match(opt_lambda, cv_summary$lambda)],
+    resultsx = cv_summary,
+    Lambda = final$Lambda,
+    B = final$B_opt,
+    lambda_y = NA_real_,
+    lambda_y_se = NA_real_,
+    cv_summary = cv_summary,
+    cv_folds = cv_folds,
+    fit = final
   )
 }

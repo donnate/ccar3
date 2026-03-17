@@ -51,6 +51,65 @@ cleanup_parallel_backend <- function(cl = NULL, verbose = FALSE) {
   invisible(NULL)
 }
 
+.safe_mean_na <- function(x) {
+  out <- mean(x, na.rm = TRUE)
+  if (is.nan(out)) NA_real_ else out
+}
+
+.safe_sd_na <- function(x) {
+  out <- stats::sd(x, na.rm = TRUE)
+  if (is.nan(out)) NA_real_ else out
+}
+
+.find_local_global_names <- function(fun) {
+  if (!requireNamespace("codetools", quietly = TRUE)) {
+    return(character())
+  }
+
+  env <- environment(fun)
+  if (is.null(env)) {
+    return(character())
+  }
+
+  globals <- tryCatch(codetools::findGlobals(fun, merge = FALSE), error = function(e) NULL)
+  if (is.null(globals)) {
+    return(character())
+  }
+
+  names <- unique(c(globals$variables, globals$functions))
+  names <- names[nzchar(names) & !grepl("^[[:punct:]]+$", names)]
+
+  binding_env <- function(name, start) {
+    cur <- start
+    while (!identical(cur, emptyenv())) {
+      if (exists(name, envir = cur, inherits = FALSE)) {
+        return(cur)
+      }
+      cur <- parent.env(cur)
+    }
+    NULL
+  }
+
+  keep <- vapply(names, function(name) {
+    where <- binding_env(name, env)
+    if (is.null(where) || identical(where, baseenv())) {
+      return(FALSE)
+    }
+
+    if ("ccar3" %in% loadedNamespaces()) {
+      ccar3_ns <- asNamespace("ccar3")
+      if (exists(name, envir = ccar3_ns, inherits = FALSE)) {
+        return(FALSE)
+      }
+    }
+
+    env_name <- environmentName(where)
+    identical(where, globalenv()) || identical(env_name, "")
+  }, logical(1))
+
+  names[keep]
+}
+
 initialize_parallel_workers <- function(cl,
                                         pkg = "ccar3",
                                         pkg_path = NULL,
@@ -61,6 +120,9 @@ initialize_parallel_workers <- function(cl,
 
   parallel::clusterEvalQ(cl, {
     Sys.setenv(
+      KMP_SHM_DISABLE = 1,
+      KMP_SHM_DIR = "/tmp",
+      TMPDIR = "/tmp",
       OMP_NUM_THREADS = 1,
       OPENBLAS_NUM_THREADS = 1,
       MKL_NUM_THREADS = 1,
@@ -68,6 +130,24 @@ initialize_parallel_workers <- function(cl,
     )
     NULL
   })
+
+  if (is.null(pkg_path)) {
+    ns_path <- tryCatch({
+      if (requireNamespace("pkgload", quietly = TRUE) &&
+          pkg %in% loadedNamespaces() &&
+          pkgload::is_dev_package(pkg)) {
+        getNamespaceInfo(asNamespace(pkg), "path")
+      } else {
+        ""
+      }
+    }, error = function(e) "")
+
+    if (nzchar(ns_path) &&
+        file.exists(file.path(ns_path, "DESCRIPTION")) &&
+        file.exists(file.path(ns_path, "NAMESPACE"))) {
+      pkg_path <- ns_path
+    }
+  }
 
   if (is.null(pkg_path)) {
     wd <- tryCatch(normalizePath(getwd(), mustWork = FALSE), error = function(e) "")
@@ -165,4 +245,56 @@ setup_parallel_backend <- function(num_cores = NULL, verbose = FALSE) {
   }
 
   return(cl)
+}
+
+run_lambda_jobs <- function(lambdas,
+                            run_one,
+                            parallelize = TRUE,
+                            nb_cores = NULL,
+                            packages = character(),
+                            exports = NULL,
+                            verbose = FALSE) {
+  if (!parallelize) {
+    return(lapply(lambdas, run_one))
+  }
+
+  if (!requireNamespace("doParallel", quietly = TRUE)) {
+    stop("Package 'doParallel' must be installed to use the parallelization option.",
+         call. = FALSE)
+  }
+
+  if (!requireNamespace("crayon", quietly = TRUE)) {
+    stop("Package 'crayon' must be installed to use the parallelization option.",
+         call. = FALSE)
+  }
+
+  cl <- setup_parallel_backend(nb_cores, verbose = verbose)
+  if (is.null(cl)) {
+    warning("Parallel setup failed; running CV serially.", immediate. = TRUE)
+    return(lapply(lambdas, run_one))
+  }
+
+  initialize_parallel_workers(cl, verbose = verbose)
+  local_env <- environment(run_one)
+  local_names <- if (is.null(local_env)) character() else ls(envir = local_env, all.names = TRUE)
+  local_names <- setdiff(local_names, "run_one")
+  if (length(local_names) > 0) {
+    parallel::clusterExport(cl, varlist = local_names, envir = local_env)
+  }
+
+  global_names <- unique(c(exports, .find_local_global_names(run_one)))
+  global_names <- setdiff(global_names, c("run_one", local_names))
+  global_names <- global_names[vapply(global_names, exists, logical(1), envir = globalenv(), inherits = FALSE)]
+  if (length(global_names) > 0) {
+    parallel::clusterExport(cl, varlist = global_names, envir = globalenv())
+  }
+
+  parallel::clusterExport(cl, varlist = "run_one", envir = parent.frame())
+  doParallel::registerDoParallel(cl)
+  on.exit(cleanup_parallel_backend(cl), add = TRUE)
+
+  foreach::foreach(
+    lambda = lambdas,
+    .packages = unique(c(packages, "foreach"))
+  ) %dopar% run_one(lambda)
 }

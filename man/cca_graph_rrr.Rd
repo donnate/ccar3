@@ -31,7 +31,7 @@ cca_graph_rrr(
 
 \item{Gamma}{Graph constraint matrix (g x p)}
 
-\item{Sx}{Optional covariance matrix for X. If NULL, computed as t(X) \%*\% X / n}
+\item{Sx}{Optional covariance matrix for X. Kept for backward compatibility; the graph fit now postprocesses directly from \code{X} and does not need to form \code{Sx}.}
 
 \item{Sy}{Optional covariance matrix for Y. If NULL, computed similarly; optionally shrunk via Ledoit-Wolf}
 

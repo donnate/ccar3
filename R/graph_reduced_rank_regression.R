@@ -146,6 +146,29 @@ library(foreach)
   )
 }
 
+.project_graph_rrr_coefficients <- function(Bhat, X, r, Sx = NULL) {
+  r_eff <- min(r, nrow(Bhat), ncol(Bhat))
+  if (r_eff < 1 || r_eff >= ncol(Bhat)) {
+    return(Bhat)
+  }
+
+  if (is.null(Sx)) {
+    sx_svd <- svd(X / sqrt(nrow(X)), nu = 0, nv = min(nrow(X), ncol(X)))
+    sqrt_Sx_B <- sx_svd$v %*% (sx_svd$d * crossprod(sx_svd$v, Bhat))
+  } else {
+    svd_Sx <- svd(as.matrix(Sx), nu = 0, nv = ncol(Sx))
+    sqrt_Sx_B <- svd_Sx$v %*% (sqrt(pmax(svd_Sx$d, 0)) * crossprod(svd_Sx$v, Bhat))
+  }
+
+  weighted_svd <- .rrr_safe_rank_svd(sqrt_Sx_B, r_eff, prefer_sparse = FALSE)
+  if (is.null(weighted_svd)) {
+    return(Bhat)
+  }
+
+  Vr <- weighted_svd$v[, seq_len(r_eff), drop = FALSE]
+  Bhat %*% Vr %*% t(Vr)
+}
+
 .fit_graph_rrr_preprocessed <- function(X, Y,
                                         Sx = NULL, Sy = NULL,
                                         lambda = 0, r,
@@ -168,16 +191,6 @@ library(foreach)
   }
 
   fro_norm <- function(M) sqrt(sum(M^2))
-
-  sx_svd <- NULL
-  if (is.null(Sx)) {
-    if (p > n) {
-      # For p > n, avoid explicitly forming p x p covariance.
-      sx_svd <- svd(X / sqrt(n))
-    } else {
-      Sx <- crossprod(X) / n
-    }
-  }
 
   if (is.null(Sy)) {
     Sy <- crossprod(Y) / n
@@ -252,27 +265,19 @@ library(foreach)
     cat("rank of XPi:", qr(XPi)$rank, "\n")
   }
 
-  if (!is.null(sx_svd)) {
-    sqrt_Sx_B <- sx_svd$v %*% (sx_svd$d * crossprod(sx_svd$v, B_opt))
-  } else {
-    svd_Sx <- svd(as.matrix(Sx))
-    sqrt_Sx_B <- svd_Sx$u %*% (sqrt(pmax(svd_Sx$d, 0)) * crossprod(svd_Sx$u, B_opt))
-  }
-
-  sol <- svd(sqrt_Sx_B)
-  if (verbose) {
-    cat("Singular values of sqrt(Sx) %*% B:\n")
-    print(sol$d)
-  }
-  V <- sqrt_inv_Sy %*% sol$v[, 1:r]
-  inv_D <- diag(ifelse(sol$d[1:r] > 1e-4, 1 / sol$d[1:r], 0))
-  U <- B_opt %*% sol$v[, 1:r] %*% inv_D
+  B_post <- .project_graph_rrr_coefficients(B_opt, X, r, Sx = Sx)
+  post <- .postprocess_rrr_fit(
+    B_post, X, Y, sqrt_inv_Sy, r,
+    ridge_whiten = max(thresh_0, 1e-8),
+    thresh_0 = thresh_0,
+    verbose = verbose
+  )
 
   list(
-    U = U,
-    V = V,
-    loss = mean((Y %*% V - X %*% U)^2),
-    cor = sapply(1:r, function(i) cov(X %*% U[, i], Y %*% V[, i]))
+    U = post$U,
+    V = post$V,
+    loss = post$loss,
+    cor = post$cor
   )
 }
 
@@ -295,7 +300,7 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
     folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   }
 
-  rmse <- foreach(i = seq_along(folds), .combine = c, .packages = c('Matrix')) %do% {
+  rmse <- vapply(seq_along(folds), function(i) {
     n_full <- nrow(X)
     X_train <- X[-folds[[i]], ]
     Y_train <- Y[-folds[[i]], ]
@@ -346,9 +351,9 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
       sqrt(mean((X_val %*% fit$U - Y_val %*% fit$V)^2))
     }, error = function(e) {
       message("Error in fold ", i, ": ", conditionMessage(e))
-      return(NA)
+      NA_real_
     })
-  }
+  }, numeric(1))
 
   if (return_fold_values) {
     return(rmse)
@@ -412,26 +417,40 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   Y <- .preprocess_matrix(Y, preprocess_mode)
 
   n <- nrow(X)
-  Sx <- if (ncol(X) > n) NULL else crossprod(X) / n
+  Sx <- NULL
   Sy <- if (LW_Sy) NULL else crossprod(Y) / n
   graph_cache <- .prepare_graph_cache(Gamma, max(thresh_0, 1e-6), Gamma_dagger = Gamma_dagger)
   solved_tX <- if (graph_cache$mode == "regularized") graph_cache$solve_L(t(X)) else NULL
   full_graph_design <- if (!is.null(solved_tX)) .transform_graph_design(graph_cache, solved_tX = solved_tX) else NULL
 
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
+  .rrr_chol_jitter <- .rrr_chol_jitter
+  .rrr_invsqrt_psd <- .rrr_invsqrt_psd
+  .rrr_whiten_factor <- .rrr_whiten_factor
+  .rrr_safe_rank_svd <- .rrr_safe_rank_svd
+  .postprocess_rrr_fit <- .postprocess_rrr_fit
+  .project_graph_rrr_coefficients <- .project_graph_rrr_coefficients
+  .resolve_preprocess_mode <- .resolve_preprocess_mode
+  .preprocess_matrix <- .preprocess_matrix
+  .make_graph_invSx_apply <- .make_graph_invSx_apply
+  .prepare_graph_cache <- .prepare_graph_cache
+  .transform_graph_design <- .transform_graph_design
+  .reconstruct_graph_coefficients <- .reconstruct_graph_coefficients
+  .fit_graph_rrr_preprocessed <- .fit_graph_rrr_preprocessed
+  cca_graph_rrr <- cca_graph_rrr
 
-  safe_mean <- function(x) {
-    out <- mean(x, na.rm = TRUE)
-    if (is.nan(out)) NA_real_ else out
-  }
+  environment(.postprocess_rrr_fit) <- environment()
+  environment(.project_graph_rrr_coefficients) <- environment()
+  environment(.fit_graph_rrr_preprocessed) <- environment()
+  environment(cca_graph_rrr) <- environment()
 
-  safe_sd <- function(x) {
-    out <- stats::sd(x, na.rm = TRUE)
-    if (is.nan(out)) NA_real_ else out
-  }
+  graph_rrr_cv_folds <- cca_graph_rrr_cv_folds
+  environment(graph_rrr_cv_folds) <- environment()
+  safe_mean_na <- .safe_mean_na
+  safe_sd_na <- .safe_sd_na
 
   run_cv <- function(lambda) {
-    fold_values <- cca_graph_rrr_cv_folds(
+    fold_values <- graph_rrr_cv_folds(
       X, Y, Gamma,
       Sx = Sx, Sy = Sy,
       kfolds = kfolds,
@@ -450,8 +469,8 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
     list(
       summary = data.frame(
         lambda = lambda,
-        rmse = safe_mean(fold_values),
-        se = safe_sd(fold_values) / sqrt(sum(!is.na(fold_values))),
+        rmse = safe_mean_na(fold_values),
+        se = safe_sd_na(fold_values) / sqrt(sum(!is.na(fold_values))),
         stringsAsFactors = FALSE
       ),
       fold = data.frame(
@@ -503,8 +522,22 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
     }
    }
 
+  graph_rrr_parallel_exports <- c(
+    ".rrr_chol_jitter", ".rrr_invsqrt_psd",
+    ".rrr_whiten_factor", ".rrr_safe_rank_svd",
+    ".postprocess_rrr_fit", ".project_graph_rrr_coefficients",
+    ".resolve_preprocess_mode", ".preprocess_matrix",
+    ".make_graph_invSx_apply", ".prepare_graph_cache",
+    ".transform_graph_design", ".reconstruct_graph_coefficients",
+    ".fit_graph_rrr_preprocessed"
+  )
+
    if (parallelize) {
-    results_list <- foreach(lambda = lambdas, .packages = c("Matrix", "caret")) %dopar% run_cv(lambda)
+    results_list <- foreach(
+      lambda = lambdas,
+      .packages = c("Matrix", "caret"),
+      .export = graph_rrr_parallel_exports
+    ) %dopar% run_cv(lambda)
   } else {
     results_list <- lapply(lambdas, run_cv)
   }
@@ -555,7 +588,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
 #' @param X Matrix of predictors (n x p)
 #' @param Y Matrix of responses (n x q)
 #' @param Gamma Graph constraint matrix (g x p)
-#' @param Sx Optional covariance matrix for X. If NULL, computed as t(X) %*% X / n
+#' @param Sx Optional covariance matrix for X. Kept for backward compatibility; the graph fit now postprocesses directly from `X` and does not need to form `Sx`.
 #' @param Sy Optional covariance matrix for Y. If NULL, computed similarly; optionally shrunk via Ledoit-Wolf
 #' @param Sxy Optional cross-covariance matrix (not currently used)
 #' @param lambda Regularization parameter for sparsity

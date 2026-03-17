@@ -42,7 +42,7 @@ cca_rrr_cv(
 
 \item{LW_Sy}{Whether to use Ledoit-Wolf shrinkage for Sy.}
 
-\item{standardize}{Logical; should X and Y be scaled.}
+\item{standardize}{Logical; should X and Y be scaled. Data are preprocessed once up front, and fold fits reuse those transformed matrices without re-centering or re-scaling inside each fold.}
 
 \item{rho}{ADMM parameter.}
 
@@ -70,6 +70,9 @@ A list with elements:
 \item lambda: Optimal regularisation parameter lambda chosen by CV
 \item rmse: Mean squared error of prediction (as computed in the CV)
 \item cor: Canonical correlations
+\item cv_summary: Data frame with one row per lambda containing mean RMSE and its foldwise standard error
+\item cv_folds: Data frame with fold-level RMSE values for each lambda
+\item fit: Final fit at the selected lambda
 }
 }
 \description{

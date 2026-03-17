@@ -93,3 +93,21 @@ test_that("cca_rrr exposes matrix-free ADMM tuning arguments", {
   expect_equal(dim(result$U), c(12, 2))
   expect_equal(dim(result$V), c(4, 2))
 })
+
+test_that("cca_rrr can skip internal preprocessing", {
+  set.seed(21)
+  X <- scale(matrix(rnorm(90 * 10), 90, 10), center = TRUE, scale = FALSE)
+  Y <- scale(matrix(rnorm(90 * 4), 90, 4), center = TRUE, scale = FALSE)
+
+  result <- cca_rrr(
+    X, Y, r = 2,
+    highdim = TRUE,
+    solver = "ADMM",
+    standardize = FALSE,
+    preprocess = FALSE
+  )
+
+  expect_type(result, "list")
+  expect_equal(dim(result$U), c(10, 2))
+  expect_equal(dim(result$V), c(4, 2))
+})

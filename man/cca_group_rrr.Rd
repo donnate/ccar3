@@ -21,6 +21,9 @@ cca_group_rrr(
   niter = 10000,
   thresh = 1e-04,
   thresh_0 = 1e-06,
+  matrix_free_threshold = 4000L,
+  cg_tol = 1e-06,
+  cg_maxiter = NULL,
   verbose = FALSE
 )
 }
@@ -57,6 +60,12 @@ cca_group_rrr(
 
 \item{thresh_0}{tolerance for declaring entries non-zero}
 
+\item{matrix_free_threshold}{For ADMM: when both \code{n} and \code{p} are at least this value, use a matrix-free conjugate-gradient solve instead of forming a dense linear system.}
+
+\item{cg_tol}{Relative tolerance for the matrix-free conjugate-gradient solve used in ADMM.}
+
+\item{cg_maxiter}{Maximum iterations for the matrix-free conjugate-gradient solve. Defaults to \code{min(p, 1000)}.}
+
 \item{verbose}{Print diagnostics}
 }
 \value{
@@ -66,6 +75,8 @@ A list with elements:
 \item{V}{Canonical direction matrix for Y (q x r)}
 \item{cor}{Canonical covariances}
 \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
+\item{Lambda}{Canonical correlations}
+\item{B_opt}{Estimated reduced-rank coefficient matrix}
 }
 }
 \description{

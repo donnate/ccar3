@@ -20,6 +20,9 @@ cca_group_rrr_cv(
   thresh_0 = 1e-06,
   niter = 10000,
   thresh = 1e-04,
+  matrix_free_threshold = 4000L,
+  cg_tol = 1e-06,
+  cg_maxiter = NULL,
   verbose = FALSE,
   nb_cores = NULL
 )
@@ -39,13 +42,9 @@ cca_group_rrr_cv(
 
 \item{parallelize}{Whether to use parallel processing (default is FALSE)}
 
-<<<<<<< HEAD
-=======
 \item{standardize}{Backward-compatible preprocessing flag: TRUE = \code{"scale"}, FALSE = \code{"center"}.}
 
 \item{preprocess}{Preprocessing mode. One of \code{"scale"} (center + scale), \code{"center"} (center only), or \code{"none"}.}
-
->>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)}
 
 \item{solver}{Either "ADMM" or "CVXR"}
@@ -57,6 +56,12 @@ cca_group_rrr_cv(
 \item{niter}{Maximum number of ADMM iterations}
 
 \item{thresh}{Convergence threshold for ADMM}
+
+\item{matrix_free_threshold}{For ADMM: when both \code{n} and \code{p} are at least this value, use a matrix-free conjugate-gradient solve instead of forming a dense linear system.}
+
+\item{cg_tol}{Relative tolerance for the matrix-free conjugate-gradient solve used in ADMM.}
+
+\item{cg_maxiter}{Maximum iterations for the matrix-free conjugate-gradient solve. Defaults to \code{min(p, 1000)}.}
 
 \item{verbose}{Print diagnostics}
 
@@ -70,6 +75,9 @@ A list with elements:
 \item{lambda}{Optimal regularisation parameter lambda chosen by CV}
 \item{rmse}{Mean squared error of prediction (as computed in the CV)}
 \item{cor}{Canonical covariances}
+\item{cv_summary}{Data frame with one row per lambda containing mean RMSE and its foldwise standard error}
+\item{cv_folds}{Data frame with fold-level RMSE values for each lambda}
+\item{fit}{Final fit at the selected lambda}
 }
 }
 \description{

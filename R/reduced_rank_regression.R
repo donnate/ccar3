@@ -413,6 +413,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
 #' @param standardize Logical; should X and Y be centered and scaled. If FALSE, they will be centered but not scaled.
+#' @param preprocess Logical; should `cca_rrr()` preprocess `X` and `Y` internally? Set to `FALSE` when data have already been centered/scaled upstream.
 #' @param rho ADMM parameter.
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
@@ -437,6 +438,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                     solver="ADMM",
                     LW_Sy = TRUE,
                     standardize = TRUE,
+                    preprocess = TRUE,
                     rho=1,
                     niter=1e4,
                     thresh = 1e-4, thresh_0 = 0,
@@ -448,8 +450,13 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   n <- nrow(X)
   p <- ncol(X)
   
-  X <- if (standardize) scale(X) else scale(X, scale = FALSE)
-  Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
+  if (preprocess) {
+    X <- if (standardize) scale(X) else scale(X, scale = FALSE)
+    Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
+  } else {
+    X <- as.matrix(X)
+    Y <- as.matrix(Y)
+  }
   
   if (is.null(Sx) && !highdim) Sx <- crossprod(X) / n
   if (is.null(Sy)) {
@@ -521,6 +528,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
 #' @param standardize Logical; should X and Y be scaled.
+#' Data are preprocessed once up front, and fold fits reuse those transformed matrices without re-centering or re-scaling inside each fold.
 #' @param rho ADMM parameter.
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
@@ -538,6 +546,9 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #'   \item lambda: Optimal regularisation parameter lambda chosen by CV
 #'   \item rmse: Mean squared error of prediction (as computed in the CV)
 #'   \item cor: Canonical correlations
+#'   \item cv_summary: Data frame with one row per lambda containing mean RMSE and its foldwise standard error
+#'   \item cv_folds: Data frame with fold-level RMSE values for each lambda
+#'   \item fit: Final fit at the selected lambda
 #' }
 #' @importFrom foreach foreach %dopar%
 #' @importFrom foreach foreach %do%
@@ -565,16 +576,35 @@ cca_rrr_cv <- function(X, Y,
   Sx <- NULL
   Sy <- if (LW_Sy) NULL else crossprod(Y) / n
   folds <- caret::createFolds(1:n, k = kfolds, list = TRUE)
+  safe_mean_na <- .safe_mean_na
+  safe_sd_na <- .safe_sd_na
   cv_function <- function(lambda) {
-    #print(lambda)
-    cca_rrr_cv_folds(X, Y, Sx=Sx, Sy=Sy, kfolds=kfolds, 
-                     LW_Sy = LW_Sy,
-                     lambda=lambda, r=r, solver=solver, 
-                     rho=rho, niter=niter, thresh=thresh,
-                     matrix_free_threshold = matrix_free_threshold,
-                     cg_tol = cg_tol,
-                     cg_maxiter = cg_maxiter,
-                     thresh_0=thresh_0, folds = folds)
+    fold_values <- cca_rrr_cv_folds(
+      X, Y, Sx = Sx, Sy = Sy, kfolds = kfolds,
+      LW_Sy = LW_Sy,
+      lambda = lambda, r = r, solver = solver,
+      rho = rho, niter = niter, thresh = thresh,
+      matrix_free_threshold = matrix_free_threshold,
+      cg_tol = cg_tol,
+      cg_maxiter = cg_maxiter,
+      thresh_0 = thresh_0, folds = folds,
+      return_fold_values = TRUE
+    )
+
+    list(
+      summary = data.frame(
+        lambda = lambda,
+        rmse = safe_mean_na(fold_values),
+        se = safe_sd_na(fold_values) / sqrt(sum(!is.na(fold_values))),
+        stringsAsFactors = FALSE
+      ),
+      fold = data.frame(
+        lambda = lambda,
+        fold = seq_along(fold_values),
+        rmse = fold_values,
+        stringsAsFactors = FALSE
+      )
+    )
   }
   
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
@@ -625,7 +655,8 @@ cca_rrr_cv <- function(X, Y,
       "cca_rrr_cv_folds", "cca_rrr", "solve_rrr_admm", "solve_rrr_cvxr",
       "make_invSx_apply", ".rrr_cg_solve", ".rrr_chol_jitter",
       ".rrr_invsqrt_psd", ".rrr_whiten_factor", ".rrr_safe_rank_svd",
-      ".postprocess_rrr_fit", "compute_sqrt_inv"
+      ".postprocess_rrr_fit", "compute_sqrt_inv",
+      ".safe_mean_na", ".safe_sd_na"
     )
     if (solver  %in% c("CVX", "CVXR" )){
         if (!requireNamespace("CVXR", quietly = TRUE)) {
@@ -633,42 +664,42 @@ cca_rrr_cv <- function(X, Y,
          call. = FALSE)
           }
 
-      resultsx <- foreach(
+      results_list <- foreach(
         lambda = lambdas,
-        .combine = rbind,
         .packages = c("CVXR", "Matrix"),
         .export = rrr_parallel_exports
       ) %dopar% {
-      data.frame(lambda=lambda, rmse=cv_function(lambda))
-    }
+        cv_function(lambda)
+      }
 
     }else{
-      resultsx <- foreach(
+      results_list <- foreach(
         lambda = lambdas,
-        .combine = rbind,
         .export = rrr_parallel_exports
       ) %dopar% {
-      data.frame(lambda=lambda, rmse=cv_function(lambda))
-    }
+        cv_function(lambda)
+      }
     }
     
   } else {
-    resultsx <- data.frame(lambda = lambdas)
-    resultsx$rmse <- sapply(lambdas, cv_function)
-    
+    results_list <- lapply(lambdas, cv_function)
   }
-  
-  resultsx <- resultsx %>% 
+
+  cv_summary <- dplyr::bind_rows(lapply(results_list, `[[`, "summary"))
+  cv_folds <- dplyr::bind_rows(lapply(results_list, `[[`, "fold"))
+
+  cv_summary <- cv_summary %>% 
     dplyr::mutate(rmse = ifelse(is.na(rmse) | rmse == 0, 1e8, rmse)) %>%
     dplyr::filter(rmse > 1e-5)
   
-  opt_lambda <- resultsx$lambda[which.min(resultsx$rmse)]
+  opt_lambda <- cv_summary$lambda[which.min(cv_summary$rmse)]
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
 
   final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, 
                    lambda=opt_lambda, r=r,
                    highdim=TRUE, solver=solver,
-                   standardize=FALSE, LW_Sy=LW_Sy, rho=rho, niter=niter, 
+                   standardize=FALSE, preprocess=FALSE,
+                   LW_Sy=LW_Sy, rho=rho, niter=niter, 
                    matrix_free_threshold = matrix_free_threshold,
                    cg_tol = cg_tol,
                    cg_maxiter = cg_maxiter,
@@ -678,11 +709,14 @@ cca_rrr_cv <- function(X, Y,
   return(list(U = final$U, 
        V = final$V,
        lambda = opt_lambda,
-       resultsx = resultsx,
-       rmse = resultsx$rmse,
+       resultsx = cv_summary,
+       rmse = cv_summary$rmse,
        cor = final$cor,
        Lambda = final$Lambda,
-       B = final$B_opt
+       B = final$B_opt,
+       cv_summary = cv_summary,
+       cv_folds = cv_folds,
+       fit = final
        ))
 }
 
@@ -701,14 +735,14 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                              cg_tol = 1e-6,
                              cg_maxiter = NULL,
                              thresh = 1e-4,
-                             folds = NULL) {
+                             folds = NULL,
+                             return_fold_values = FALSE) {
   if (is.null(folds)) {
     folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   }
 
   
-  rmse <- foreach(i = seq_along(folds), .combine = c) %do% { 
-    
+  rmse <- vapply(seq_along(folds), function(i) {
     n <- nrow(X)
     X_train <- X[-folds[[i]], ]; Y_train <- Y[-folds[[i]], ]
     X_val <- X[folds[[i]], ]; Y_val <- Y[folds[[i]], ]
@@ -730,7 +764,8 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
       final <- cca_rrr(X_train, Y_train, 
                        Sx=Sx_train, Sy=Sy_train, highdim=TRUE,
                        lambda=lambda, r=r, solver=solver,
-                       LW_Sy=LW_Sy, standardize=FALSE, rho=rho, niter=niter, 
+                       LW_Sy=LW_Sy, standardize=FALSE, preprocess=FALSE,
+                       rho=rho, niter=niter, 
                        matrix_free_threshold = matrix_free_threshold,
                        cg_tol = cg_tol,
                        cg_maxiter = cg_maxiter,
@@ -739,10 +774,11 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
       mean((X_val %*% final$U - Y_val %*% final$V)^2)
     }, error = function(e) {
       message("Error in fold ", i, ": ", conditionMessage(e))
-      NA
+      NA_real_
     })
-  }
+  }, numeric(1))
   
-  if (mean(is.na(rmse)) == 1) return(1e8)
+  if (return_fold_values) return(rmse)
+  if (all(is.na(rmse))) return(1e8)
   mean(rmse, na.rm = TRUE)
 }

@@ -978,14 +978,6 @@ ecca.eval <- function(
 
   # parallel setup
   if (parallel) {
-    if (!requireNamespace("doParallel", quietly = TRUE) ||
-        !requireNamespace("foreach", quietly = TRUE)) {
-      warning("Parallel requested but doParallel/foreach not available; running serial.")
-      parallel <- FALSE
-    }
-  }
-
-  if (parallel) {
     cores <- if (is.null(nb_cores)) max(1L, parallel::detectCores() - 1L) else as.integer(nb_cores)
     cores <- min(cores, length(folds))
     Sys.setenv(
@@ -995,109 +987,104 @@ ecca.eval <- function(
       VECLIB_MAXIMUM_THREADS = 1
     )
 
-    # Use PSOCK when verbose so worker stdout forwarding is more reliable.
-    # Use FORK only when quiet.
+    cl <- setup_parallel_backend(cores, verbose = verbose)
+    if (is.null(cl)) {
+      warning("All parallel setup attempts failed. Proceeding in serial mode.", immediate. = TRUE)
+      parallel <- FALSE
+    }
+  }
+
+  if (parallel) {
+    initialize_parallel_workers(cl, verbose = verbose)
+    on.exit(cleanup_parallel_backend(cl), add = TRUE)
     if (verbose) {
-      cl <- parallel::makeCluster(cores, type = "PSOCK", outfile = "")
-    } else {
-      cl <- tryCatch(parallel::makeCluster(cores, type = "FORK", outfile = ""), error = function(e) NULL)
-      if (is.null(cl)) cl <- parallel::makeCluster(cores, type = "PSOCK", outfile = "")
+      cat("\nRunning CV in parallel on", cores, "cores\n")
+    }
+    ecca_across_lambdas_current <- ecca_across_lambdas
+    safe_rank_svd_current <- safe_rank_svd
+    whiten_factor_current <- whiten_factor
+    chol_jitter_current <- chol_jitter
+    invsqrt_psd_current <- invsqrt_psd
+    soft_thresh_current <- soft_thresh
+    soft_thresh2_current <- soft_thresh2
+    safe_rank_svd <- safe_rank_svd_current
+    whiten_factor <- whiten_factor_current
+    chol_jitter <- chol_jitter_current
+    invsqrt_psd <- invsqrt_psd_current
+    soft_thresh <- soft_thresh_current
+    soft_thresh2 <- soft_thresh2_current
+    collect_logs_parallel <- isTRUE(verbose)
+    ecca_parallel_fold_worker <- function(fold_id) {
+      tryCatch({
+        fold <- folds[[fold_id]]
+        pid <- Sys.getpid()
+        prefix <- sprintf("[pid=%d fold=%d]", pid, fold_id)
+
+        tr <- setdiff(seq_len(n), fold)
+        Xtr <- X[tr, , drop = FALSE]
+        Ytr <- Y[tr, , drop = FALSE]
+        Xva <- X[fold, , drop = FALSE]
+        Yva <- Y[fold, , drop = FALSE]
+
+        fit <- ecca_across_lambdas_current(
+          Xtr, Ytr, lambdas = lambdas, groups = groups, r = r,
+          standardize = FALSE, rho = rho, B0 = B0,
+          eps = eps, maxiter = maxiter,
+          verbose = collect_logs_parallel,
+          log_prefix = prefix,
+          admm_print_every = 50L,
+          lambda_print = collect_logs_parallel,
+          epsilon_sv = epsilon_sv, ridge_whiten = ridge_whiten,
+          preprocess = FALSE,
+          return_uv = FALSE,
+          collect_logs = collect_logs_parallel,
+          X_val = Xva, Y_val = Yva,
+          scoring_method = scoring_method
+        )
+
+        list(
+          fold_id = fold_id,
+          scores = fit$scores,
+          logs = fit$logs
+        )
+      }, error = function(e) e)
     }
 
-    doParallel::registerDoParallel(cl)
-    on.exit(parallel::stopCluster(cl), add = TRUE)
-    if (verbose) {
-      cat("\nRunning CV in parallel on", cores, "cores (cluster type:", cl$clusterType, ")\n")
-    }
-
-    parallel::clusterEvalQ(cl, {
-      Sys.setenv(
-        OMP_NUM_THREADS = 1,
-        OPENBLAS_NUM_THREADS = 1,
-        MKL_NUM_THREADS = 1,
-        VECLIB_MAXIMUM_THREADS = 1
-      )
-      NULL
-    })
-
-
-    # ---- inside ecca.eval(), after folds created and parallel backend registered ----
-
-    t0 <- Sys.time()
-    pb <- utils::txtProgressBar(min = 0, max = length(folds), style = 3)
-    done <- 0L
-
-    combine_with_progress <- function(acc, ...) {
-      xs <- list(...)
-      for (x in xs) {
-        done <<- done + 1L
-        utils::setTxtProgressBar(pb, done)
-
-        # print a short line so you see activity in long runs
-        elapsed <- difftime(Sys.time(), t0, units = "secs")
-        cat(sprintf("\n[%s] finished fold %d/%d (elapsed %.1fs)",
-                    format(Sys.time(), "%H:%M:%S"),
-                    done, length(folds), as.numeric(elapsed)))
-
-        if (!inherits(x, "error") && is.list(x) && !is.null(x$logs) && length(x$logs) > 0) {
-          cat("\n")
-          cat(paste(x$logs, collapse = "\n"))
-          cat("\n")
-          flush.console()
-          x <- x$scores
-        }
-
-        acc <- c(acc, list(x))
-      }
-      acc
-    }
-
-    cv_list <- foreach::foreach(
-      fold_id = seq_along(folds),
-      .combine = combine_with_progress,
-      .init = list(),
-      .multicombine = TRUE,
-      .inorder = FALSE,
-      .export = c(
-        "ecca_across_lambdas",
-        "soft_thresh", "soft_thresh2",
-        "chol_jitter", "invsqrt_psd", "whiten_factor", "safe_rank_svd"
+    parallel::clusterExport(
+      cl,
+      varlist = c(
+        "X", "Y", "folds", "n",
+        "lambdas", "groups", "r",
+        "rho", "B0", "eps", "maxiter",
+        "epsilon_sv", "ridge_whiten", "scoring_method",
+        "collect_logs_parallel",
+        "ecca_across_lambdas_current",
+        "safe_rank_svd",
+        "whiten_factor",
+        "chol_jitter",
+        "invsqrt_psd",
+        "soft_thresh",
+        "soft_thresh2",
+        "ecca_parallel_fold_worker"
       ),
-      .packages = c("matrixStats"),   # <-- don’t force-load RSpectra
-      .errorhandling = "pass"
-    ) %dopar% {
+      envir = environment()
+    )
 
-      fold <- folds[[fold_id]]
-      pid <- Sys.getpid()
-      prefix <- sprintf("[pid=%d fold=%d]", pid, fold_id)
+    cv_list <- parallel::parLapplyLB(cl, seq_along(folds), ecca_parallel_fold_worker)
 
-      tr <- setdiff(seq_len(n), fold)
-      Xtr <- X[tr, , drop = FALSE]
-      Ytr <- Y[tr, , drop = FALSE]
-      Xva <- X[fold, , drop = FALSE]
-      Yva <- Y[fold, , drop = FALSE]
-
-      fit <- ecca_across_lambdas(
-        Xtr, Ytr, lambdas = lambdas, groups = groups, r = r,
-        standardize = FALSE, rho = rho, B0 = B0,
-        eps = eps, maxiter = maxiter,
-        verbose = TRUE,                 # <-- TURN ON worker printing
-        log_prefix = prefix,            # <-- NEW
-        admm_print_every = 50L,
-        lambda_print = TRUE,            # <-- NEW
-        epsilon_sv = epsilon_sv, ridge_whiten = ridge_whiten,
-        preprocess = FALSE,
-        return_uv = FALSE,
-        collect_logs = TRUE,
-        X_val = Xva, Y_val = Yva,
-        scoring_method = scoring_method
-      )
-
-      list(scores = fit$scores, logs = fit$logs)
+    if (verbose) {
+      ok_folds <- cv_list[!vapply(cv_list, inherits, logical(1), "error")]
+      if (length(ok_folds) > 0) {
+        for (res in ok_folds) {
+          if (!is.null(res$logs) && length(res$logs) > 0) {
+            cat("\n")
+            cat(paste(res$logs, collapse = "\n"))
+            cat("\n")
+          }
+        }
+        flush.console()
+      }
     }
-
-    close(pb)
-    cat("\n")  # newline after progress bar
 
     is_err <- vapply(cv_list, inherits, logical(1), "error")
 
@@ -1112,7 +1099,7 @@ ecca.eval <- function(
     }
 
     if (any(is_err)) warning(sum(is_err), " folds failed.")
-    cv_list <- cv_list[!is_err]
+    cv_list <- lapply(cv_list[!is_err], function(x) x$scores)
     if (length(cv_list) == 0) stop("All CV folds failed.")
     scores.cv <- do.call(cbind, cv_list)
     n_success <- ncol(scores.cv)
