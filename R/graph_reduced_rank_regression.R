@@ -35,6 +35,48 @@ library(caret) # Required for createFolds
   M
 }
 
+.make_graph_invSx_apply <- function(A, rho, ridge = 1e-8, verbose = FALSE) {
+  A <- as.matrix(A)
+  n <- nrow(A)
+  p <- ncol(A)
+
+  if (p <= n) {
+    gram <- crossprod(A) + rho * diag(p)
+    R <- tryCatch(chol(gram + ridge * diag(p)), error = function(e) NULL)
+
+    solve_gram <- if (!is.null(R)) {
+      function(B) backsolve(R, forwardsolve(t(R), B))
+    } else {
+      if (verbose) message("Cholesky failed in graph ADMM solve; using solve().")
+      function(B) solve(gram, B)
+    }
+
+    return(list(
+      apply = function(rhs) solve_gram(as.matrix(rhs)),
+      uses_woodbury = FALSE
+    ))
+  }
+
+  K <- diag(n) + tcrossprod(A) / rho
+  R <- tryCatch(chol(K + ridge * diag(n)), error = function(e) NULL)
+
+  solve_K <- if (!is.null(R)) {
+    function(B) backsolve(R, forwardsolve(t(R), B))
+  } else {
+    if (verbose) message("Cholesky failed in graph Woodbury solve; using solve().")
+    function(B) solve(K, B)
+  }
+
+  list(
+    apply = function(rhs) {
+      rhs <- as.matrix(rhs)
+      middle <- solve_K(A %*% rhs)
+      rhs / rho - crossprod(A, middle) / (rho^2)
+    },
+    uses_woodbury = TRUE
+  )
+}
+
 
 cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                                 Sx = NULL, Sy = NULL, kfolds = 5,
@@ -63,23 +105,19 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
     n_train <- n_full - nrow(X_val)
 
     # --- DOWNDATE TRICK ---
-    #Sx_train <- if (is.null(Sx)) NULL else (n_full * Sx - crossprod(X_val)) / n_train
-    #Sy_train <- if (is.null(Sy)) NULL else (n_full * Sy - crossprod(Y_val)) / n_train
+    Sx_train <- if (is.null(Sx)) NULL else (n_full * Sx - crossprod(X_val)) / n_train
+    Sy_train <- if (is.null(Sy)) NULL else (n_full * Sy - crossprod(Y_val)) / n_train
 
 
     
     tryCatch({
       fit <- cca_graph_rrr(X_train, Y_train, Gamma,
-                           Sx = NULL, Sy = NULL,
+                           Sx = Sx_train, Sy = Sy_train,
                            lambda = lambda, r = r,
                            standardize = standardize, preprocess = preprocess_mode,
                            LW_Sy = LW_Sy, rho = rho, niter = niter, thresh = thresh,
                            thresh_0 = thresh_0,
                            Gamma_dagger = Gamma_dagger)
-
-      print(paste("Fold completed", i, ". Evaluating on validation set..."))
-      print(colMeans(X_val %*% fit$U))
-      print(colMeans(Y_val %*% fit$V))
 
       sqrt(mean((X_val %*% fit$U - Y_val %*% fit$V)^2))
     }, error = function(e) {
@@ -149,6 +187,10 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   X <- .preprocess_matrix(X, preprocess_mode)
   Y <- .preprocess_matrix(Y, preprocess_mode)
 
+  n <- nrow(X)
+  Sx <- if (ncol(X) > n) NULL else crossprod(X) / n
+  Sy <- if (LW_Sy) NULL else crossprod(Y) / n
+
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
 
   safe_mean <- function(x) {
@@ -164,7 +206,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   run_cv <- function(lambda) {
     fold_values <- cca_graph_rrr_cv_folds(
       X, Y, Gamma,
-      Sx = NULL, Sy = NULL,
+      Sx = Sx, Sy = Sy,
       kfolds = kfolds,
       lambda = lambda, r = r,
       preprocess = "none",
@@ -246,7 +288,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   opt_lambda <- cv_summary$lambda[which.min(cv_summary$rmse)]
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
 
-  final <- cca_graph_rrr(X, Y, Gamma, Sx = NULL, Sy = NULL,
+  final <- cca_graph_rrr(X, Y, Gamma, Sx = Sx, Sy = Sy,
                          lambda = opt_lambda, r = r,
                          preprocess = "none",
                          LW_Sy = LW_Sy, rho = rho, niter = niter,
@@ -390,20 +432,8 @@ cca_graph_rrr <- function(X, Y, Gamma,
   # ADMM initialization
   new_p <- ncol(XGamma_dagger)
   prod_xy <- crossprod(XGamma_dagger, new_Ytilde) / n
-
-  if (is.null(Gamma_dagger)) {
-    A <- XGamma_dagger / sqrt(n)
-    K <- diag(nrow(A)) + tcrossprod(A) / rho
-    solve_invSx <- function(rhs) {
-      rhs <- as.matrix(rhs)
-      tmp <- A %*% rhs
-      middle <- solve(K, tmp)
-      rhs / rho - crossprod(A, middle) / (rho^2)
-    }
-  } else {
-    invSx <- solve(crossprod(XGamma_dagger) / n + rho * diag(new_p))
-    solve_invSx <- function(rhs) invSx %*% rhs
-  }
+  invSx_info <- .make_graph_invSx_apply(XGamma_dagger / sqrt(n), rho, verbose = verbose)
+  solve_invSx <- invSx_info$apply
 
   U_dual <- matrix(0, new_p, q)
   Z <- matrix(0, new_p, q)
@@ -480,4 +510,3 @@ cca_graph_rrr <- function(X, Y, Gamma,
     cor = sapply(1:r, function(i) cov(X %*% U[, i], Y %*% V[, i]))
   )
 }
-
