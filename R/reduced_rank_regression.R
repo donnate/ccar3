@@ -138,8 +138,8 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   p <- ncol(X)
   q <- ncol(Y)
   
-  X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
-  Y <- if (standardize) scale(Y) else Y # scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) else scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
   
   skip_Sx <- highdim && is.null(Sx) && p > n
   if (is.null(Sx) && !skip_Sx) Sx <- crossprod(X) / n
@@ -188,18 +188,28 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
       } else {
         Sx_active <- Sx[active_rows, active_rows, drop = FALSE]
       }
-      sqrt_Sx <- compute_sqrt(Sx_active)
-      sol <- svd(sqrt_Sx %*% B_opt[active_rows, ])
+      # sqrt_Sx <- compute_sqrt(Sx_active)
+      sol <- svd(B_opt[active_rows, ])
       V <- sqrt_inv_Sy %*% sol$v[, 1:r]
-      inv_D <- diag(sapply(sol$d[1:r], function(d) ifelse(d < 1e-4, 0, 1 / d)))
-      U <- B_opt %*% sol$v[, 1:r] %*% inv_D
-      Lambda = sol$d[1:r]
+      U <- sol$u[, 1:r]
+      U <- U %*% pracma::sqrtm(t(U) %*% Sx_active %*% U)$Binv
+      # inv_D <- diag(sapply(sol$d[1:r], function(d) ifelse(d < 1e-4, 0, 1 / d)))
+      # U <- B_opt %*% sol$v[, 1:r] %*% inv_D
+      # Lambda = sol$d[1:r]
     } else {
       U <- matrix(0, p, r)
       V <- matrix(0, q, r)
       Lambda <- rep(0, r)
     }
   }
+  XU <- X %*% U
+  if (!skip_Sx){
+    U = U %*% pracma::sqrtm(t(U) %*% Sx %*% U)$Binv
+  }else{
+    U = U %*% pracma::sqrtm(t(XU) %*% XU / n)$Binv
+  }
+  V = V %*% pracma::sqrtm(t(V) %*% Sy %*% V)$Binv
+
   XU <- X %*% U
   YV <- Y %*% V
 

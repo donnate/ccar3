@@ -51,13 +51,7 @@ cca_rrr_cv(
 
 \item{verbose}{Logical for verbose output.}
 
-<<<<<<< HEAD
-\item{Sx}{Optional X covariance matrix.}
-
-\item{Sy}{Optional Y covariance matrix.}
-=======
 \item{nb_cores}{Number of cores to use for parallelization (default is all available cores minus 1)}
->>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
 }
 \value{
 A list with elements:

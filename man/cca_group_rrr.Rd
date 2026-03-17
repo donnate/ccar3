@@ -14,10 +14,7 @@ cca_group_rrr(
   lambda = 0,
   r,
   standardize = FALSE,
-<<<<<<< HEAD
-=======
   preprocess = NULL,
->>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
   LW_Sy = TRUE,
   solver = "ADMM",
   rho = 1,

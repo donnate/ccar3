@@ -17,11 +17,6 @@ ecca.cv(
   select = "lambda.min",
   eps = 1e-04,
   maxiter = 500,
-<<<<<<< HEAD
-  verbose = F,
-  parallel = F,
-  nb_cores = NULL
-=======
   verbose = FALSE,
   parallel = FALSE,
   nb_cores = NULL,
@@ -30,7 +25,6 @@ ecca.cv(
   cv_use_median = FALSE,
   dense = TRUE,
   optimized = FALSE
->>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
 )
 }
 \arguments{
