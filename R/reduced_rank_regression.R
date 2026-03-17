@@ -144,21 +144,133 @@ library(foreach)
 }
 
 
-# Helper: efficient (Sx + rho I)^{-1} * W without forming large Sx when p >> n
-make_invSx_apply <- function(X, Sx, rho, ridge = 1e-8, verbose = FALSE) {
+.rrr_cg_solve <- function(A_mul, b, M_inv = NULL, tol = 1e-6,
+                          maxiter = NULL, x0 = NULL) {
+  p <- length(b)
+  if (is.null(maxiter)) {
+    maxiter <- min(p, 1000L)
+  }
+
+  x <- if (is.null(x0)) numeric(p) else as.numeric(x0)
+  r <- as.numeric(b) - as.numeric(A_mul(x))
+  bnorm <- sqrt(sum(b^2))
+  if (!is.finite(bnorm) || bnorm < .Machine$double.eps) {
+    return(x)
+  }
+
+  z <- if (is.null(M_inv)) r else M_inv(r)
+  rz_old <- drop(crossprod(r, z))
+  if (!is.finite(rz_old) || rz_old <= 0) {
+    return(x)
+  }
+
+  p_dir <- z
+  tol_abs <- tol * max(1, bnorm)
+
+  for (iter in seq_len(maxiter)) {
+    Ap <- as.numeric(A_mul(p_dir))
+    denom <- drop(crossprod(p_dir, Ap))
+    if (!is.finite(denom) || abs(denom) < .Machine$double.eps) {
+      break
+    }
+
+    alpha <- rz_old / denom
+    x <- x + alpha * p_dir
+    r <- r - alpha * Ap
+    if (sqrt(sum(r^2)) <= tol_abs) {
+      break
+    }
+
+    z <- if (is.null(M_inv)) r else M_inv(r)
+    rz_new <- drop(crossprod(r, z))
+    if (!is.finite(rz_new) || rz_new <= 0) {
+      break
+    }
+
+    beta <- rz_new / rz_old
+    p_dir <- z + beta * p_dir
+    rz_old <- rz_new
+  }
+
+  x
+}
+
+# Helper: efficient (Sx + rho I)^{-1} * W without forcing an explicit Sx build.
+# For very large n and p, use a matrix-free CG solve that only applies X and t(X).
+make_invSx_apply <- function(X, Sx = NULL, rho, ridge = 1e-8, verbose = FALSE,
+                             matrix_free_threshold = 4000L,
+                             cg_tol = 1e-6,
+                             cg_maxiter = NULL) {
+  n <- nrow(X)
   p <- ncol(X)
+  if (n < 1 || p < 1) stop("X must have positive dimensions.")
+
+  solve_from_factor <- function(G) {
+    R <- .rrr_chol_jitter(G, jitter = ridge)
+    function(B) backsolve(R, forwardsolve(t(R), as.matrix(B)))
+  }
+
   if (!is.null(Sx)) {
-    invSx <- solve(Sx + rho * diag(p))
+    if (verbose) message("Using direct Cholesky solve with supplied Sx.")
+    solve_gram <- solve_from_factor(Sx + rho * diag(p))
     return(list(
-      apply = function(W) invSx %*% W,
+      apply = solve_gram,
+      strategy = "direct",
       uses_woodbury = FALSE
     ))
   }
 
-  n <- nrow(X)
-  if (n < 1 || p < 1) stop("X must have positive dimensions.")
+  if (min(n, p) >= matrix_free_threshold) {
+    if (verbose) message("Using matrix-free CG solve for ADMM update.")
 
-  # Woodbury: (rho I + X'X/n)^{-1} = (1/rho)I - (1/rho^2) X' (I + XX'/(n rho))^{-1} X / n
+    diag_precond <- rho + colSums(X^2) / n
+    diag_precond[!is.finite(diag_precond) | diag_precond < ridge] <- ridge
+
+    A_mul <- function(v) {
+      as.numeric(rho * v + crossprod(X, X %*% v) / n)
+    }
+    M_inv <- function(v) {
+      as.numeric(v / diag_precond)
+    }
+
+    last_sol <- NULL
+    return(list(
+      apply = function(W) {
+        W <- as.matrix(W)
+        out <- matrix(0, p, ncol(W))
+        if (!is.null(last_sol) && identical(dim(last_sol), dim(out))) {
+          out[,] <- last_sol
+        }
+
+        for (j in seq_len(ncol(W))) {
+          out[, j] <- .rrr_cg_solve(
+            A_mul, W[, j],
+            M_inv = M_inv,
+            tol = cg_tol,
+            maxiter = cg_maxiter,
+            x0 = out[, j]
+          )
+        }
+
+        last_sol <<- out
+        out
+      },
+      strategy = "matrix_free_cg",
+      uses_woodbury = FALSE
+    ))
+  }
+
+  if (p <= n) {
+    if (verbose) message("Using direct Cholesky solve from X without precomputing Sx upstream.")
+    solve_gram <- solve_from_factor(crossprod(X) / n + rho * diag(p))
+    return(list(
+      apply = solve_gram,
+      strategy = "direct",
+      uses_woodbury = FALSE
+    ))
+  }
+
+  if (verbose) message("Using Woodbury solve for ADMM update.")
   M <- diag(n) + tcrossprod(X) / (n * rho)
   R <- tryCatch(chol(M + ridge * diag(n)), error = function(e) NULL)
 
@@ -175,6 +287,7 @@ make_invSx_apply <- function(X, Sx, rho, ridge = 1e-8, verbose = FALSE) {
       tmp <- solve_M(XW)
       (1 / rho) * W - (1 / rho^2) * crossprod(X, tmp)
     },
+    strategy = "woodbury",
     uses_woodbury = TRUE
   )
 }
@@ -182,19 +295,21 @@ make_invSx_apply <- function(X, Sx, rho, ridge = 1e-8, verbose = FALSE) {
 
 
 # Helper: ADMM-based group sparse solver
-solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verbose = FALSE, thresh_0 = 1e-6,
+solve_rrr_admm <- function(X, tilde_Y, Sx = NULL, lambda, rho=1, niter=10, thresh, verbose = FALSE, thresh_0 = 0,
                            invSx_apply = NULL) {
-  p <- ncol(X); q <- ncol(tilde_Y)
+  p <- ncol(X); 
+  q <- ncol(tilde_Y)
   n <- nrow(X)
 
   if (is.null(invSx_apply)) {
     invSx_info <- make_invSx_apply(X, Sx, rho, verbose = verbose)
     invSx_apply <- invSx_info$apply
+    if (verbose) message("ADMM linear solver strategy: ", invSx_info$strategy)
   }
 
   U <- Z <- matrix(0, p, q)
   
-  prod_xy <- crossprod(X, tilde_Y) / n
+  prod_xy <- crossprod(X, tilde_Y) / n ### size is p x q, so okay since q <<< n
   for (i in seq_len(niter)) {
     U_old <- U; Z_old <- Z
     B <- invSx_apply(prod_xy + rho * (Z - U))
@@ -230,9 +345,8 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
     if (verbose && !is.null(reason)) {
       message("Falling back to ADMM from CVXR: ", reason)
     }
-    Sx <- if (p > n) NULL else crossprod(X) / n
     solve_rrr_admm(
-      X, tilde_Y, Sx = Sx, lambda = lambda, rho = rho,
+      X, tilde_Y, Sx = NULL, lambda = lambda, rho = rho,
       niter = niter, thresh = thresh, thresh_0 = thresh_0,
       verbose = verbose
     )
@@ -308,7 +422,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                     standardize = TRUE,
                     rho=1,
                     niter=1e4,
-                    thresh = 1e-4, thresh_0 = 1e-6,
+                    thresh = 1e-4, thresh_0 = 0,
                     verbose=FALSE) {
   
   n <- nrow(X)
@@ -317,9 +431,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   X <- if (standardize) scale(X) else scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
   
-  use_highdim <- isTRUE(highdim) || p > n
-  skip_Sx <- use_highdim && is.null(Sx) && p > n
-  if (is.null(Sx) && !skip_Sx) Sx <- crossprod(X) / n
+  if (is.null(Sx) && !highdim) Sx <- crossprod(X) / n
   if (is.null(Sy)) {
     Sy <- crossprod(Y) / n
     if (LW_Sy) Sy <- as.matrix(corpcor::cov.shrink(Y, verbose=verbose))
@@ -328,7 +440,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   sqrt_inv_Sy <- compute_sqrt_inv(Sy)
   tilde_Y <- Y %*% sqrt_inv_Sy
   
-  if (!use_highdim) {
+  if (!highdim) {
     if (verbose) print("Not using highdim")
     B_fit <- solve(Sx, crossprod(X, tilde_Y) / n)
   } else {
@@ -340,8 +452,10 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
       )
     } else if (solver == "ADMM") {
       if(verbose){print("Using ADMM solver")}
-      B_fit <- solve_rrr_admm(X, tilde_Y, Sx, lambda=lambda, rho=rho, niter=niter, thresh=thresh, thresh_0=thresh_0,
-                              verbose = FALSE)
+      B_fit <- solve_rrr_admm(X, tilde_Y, Sx = Sx,
+                              lambda=lambda, rho=rho, niter=niter, 
+                              thresh=thresh, thresh_0=thresh_0,
+                              verbose = verbose)
     } else {
       if(verbose){print("Using gglasso solver")}
         if (!requireNamespace("rrpack", quietly = TRUE)) {
@@ -402,13 +516,13 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 cca_rrr_cv <- function(X, Y, 
                        r=2, 
                        lambdas=10^seq(-3, 1.5, length.out = 100),
-                       kfolds=14,
+                       kfolds=10,
                        solver="ADMM",
                        parallelize = FALSE,
                        LW_Sy = TRUE,
-                       standardize=TRUE,
+                       standardize=FALSE,
                        rho=1,
-                       thresh_0=1e-6,
+                       thresh_0=0,
                        niter=1e4,
                        thresh = 1e-4, verbose=FALSE,
                        nb_cores = NULL) {
@@ -416,16 +530,15 @@ cca_rrr_cv <- function(X, Y,
   X <- if (standardize) scale(X) else scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
   n <- nrow(X)
-  p <- ncol(X)
-  Sx <- if (p > n) NULL else matmul(t(X), X) / n
+  Sx <- NULL
   Sy <- if (LW_Sy) NULL else crossprod(Y) / n
-  folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
+  folds <- caret::createFolds(1:n, k = kfolds, list = TRUE)
   cv_function <- function(lambda) {
     #print(lambda)
     cca_rrr_cv_folds(X, Y, Sx=Sx, Sy=Sy, kfolds=kfolds, 
                      LW_Sy = LW_Sy,
                      lambda=lambda, r=r, solver=solver, 
-                     standardize=FALSE, rho=rho, niter=niter, thresh=thresh,
+                     rho=rho, niter=niter, thresh=thresh,
                      thresh_0=thresh_0, folds = folds)
   }
   
@@ -501,7 +614,8 @@ cca_rrr_cv <- function(X, Y,
   opt_lambda <- resultsx$lambda[which.min(resultsx$rmse)]
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
 
-  final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, lambda=opt_lambda, r=r,
+  final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, 
+                   lambda=opt_lambda, r=r,
                    highdim=TRUE, solver=solver,
                    standardize=FALSE, LW_Sy=LW_Sy, rho=rho, niter=niter, 
                    thresh=thresh, thresh_0=thresh_0,verbose=verbose)
@@ -524,17 +638,17 @@ cca_rrr_cv <- function(X, Y,
 cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                              lambda=0.01,
                              r=2,
-                             standardize=FALSE,
                              solver = "ADMM",
                              rho=1,
                              LW_Sy = TRUE,
                              niter=1e4,
-                             thresh_0=1e-6,
+                             thresh_0=0,
                              thresh = 1e-4,
                              folds = NULL) {
   if (is.null(folds)) {
     folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   }
+
   
   rmse <- foreach(i = seq_along(folds), .combine = c) %do% { 
     
@@ -556,7 +670,8 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
     }
     
     tryCatch({
-      final <- cca_rrr(X_train, Y_train, Sx=Sx_train, Sy=Sy_train, highdim=TRUE,
+      final <- cca_rrr(X_train, Y_train, 
+                       Sx=Sx_train, Sy=Sy_train, highdim=TRUE,
                        lambda=lambda, r=r, solver=solver,
                        LW_Sy=LW_Sy, standardize=FALSE, rho=rho, niter=niter, 
                        thresh=thresh, thresh_0=thresh_0,
