@@ -36,8 +36,14 @@ library(foreach)
   M
 }
 
+.as_double_matrix <- function(M) {
+  M <- as.matrix(M)
+  storage.mode(M) <- "double"
+  M
+}
+
 .make_graph_invSx_apply <- function(A, rho, ridge = 1e-8, verbose = FALSE) {
-  A <- as.matrix(A)
+  A <- .as_double_matrix(A)
   n <- nrow(A)
   p <- ncol(A)
 
@@ -53,7 +59,7 @@ library(foreach)
     }
 
     return(list(
-      apply = function(rhs) solve_gram(as.matrix(rhs)),
+      apply = function(rhs) solve_gram(.as_double_matrix(rhs)),
       uses_woodbury = FALSE
     ))
   }
@@ -70,7 +76,7 @@ library(foreach)
 
   list(
     apply = function(rhs) {
-      rhs <- as.matrix(rhs)
+      rhs <- .as_double_matrix(rhs)
       middle <- solve_K(A %*% rhs)
       rhs / rho - crossprod(A, middle) / (rho^2)
     },
@@ -80,15 +86,17 @@ library(foreach)
 
 .prepare_graph_cache <- function(Gamma, gamma_ridge, Gamma_dagger = NULL) {
   if (is.null(Gamma_dagger)) {
-    if (!inherits(Gamma, "sparseMatrix")) {
-      Gamma <- Matrix::Matrix(Gamma, sparse = TRUE)
+    Gamma <- if (inherits(Gamma, "dgCMatrix")) {
+      Gamma
+    } else {
+      methods::as(Matrix::Matrix(Gamma, sparse = TRUE), "dgCMatrix")
     }
 
     L_eps <- Matrix::crossprod(Gamma) + gamma_ridge * Matrix::Diagonal(n = ncol(Gamma))
     L_fac <- Matrix::Cholesky(L_eps, LDL = FALSE)
 
     solve_L <- function(rhs) {
-      as.matrix(Matrix::solve(L_fac, rhs, system = "A"))
+      as.matrix(Matrix::solve(L_fac, .as_double_matrix(rhs), system = "A"))
     }
 
     return(list(
@@ -135,7 +143,7 @@ library(foreach)
 .reconstruct_graph_coefficients <- function(graph_cache, B, Projection) {
   if (graph_cache$mode == "regularized") {
     return(list(
-      gamma_dagger_B = graph_cache$solve_L(crossprod(graph_cache$Gamma, B)),
+      gamma_dagger_B = graph_cache$solve_L(Matrix::crossprod(graph_cache$Gamma, .as_double_matrix(B))),
       Pi_projection = graph_cache$gamma_ridge * graph_cache$solve_L(Projection)
     ))
   }
@@ -211,8 +219,9 @@ library(foreach)
   Projection <- tryCatch(
     qr.solve(XPi, tilde_Y),
     error = function(e) {
-      XtX <- crossprod(XPi) + graph_cache$gamma_ridge * diag(ncol(XPi))
-      solve(XtX, crossprod(XPi, tilde_Y))
+      XtX <- .as_double_matrix(crossprod(XPi) + graph_cache$gamma_ridge * diag(ncol(XPi)))
+      rhs_proj <- .as_double_matrix(crossprod(XPi, tilde_Y))
+      solve(XtX, rhs_proj)
     }
   )
   new_Ytilde <- tilde_Y - XPi %*% Projection
@@ -277,7 +286,9 @@ library(foreach)
     U = post$U,
     V = post$V,
     loss = post$loss,
-    cor = post$cor
+    cor = post$cor,
+    Lambda = post$Lambda,
+    B_opt = B_post
   )
 }
 
@@ -310,9 +321,10 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
    # We don't even need to create X_train and Y_train explicitly for the covariance calculation
     n_train <- n_full - nrow(X_val)
 
-    # --- DOWNDATE TRICK ---
+    # Reuse downdated empirical covariances only when shrinkage is disabled.
+    # For LW_Sy = TRUE, each fold recomputes the shrinkage estimate from Y_train.
     Sx_train <- if (is.null(Sx)) NULL else (n_full * Sx - crossprod(X_val)) / n_train
-    Sy_train <- if (is.null(Sy)) NULL else (n_full * Sy - crossprod(Y_val)) / n_train
+    Sy_train <- if (LW_Sy || is.null(Sy)) NULL else (n_full * Sy - crossprod(Y_val)) / n_train
 
 
     
@@ -393,6 +405,16 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
 #'   \item{lambda}{Optimal regularisation parameter lambda chosen by CV}
 #'   \item{rmse}{Mean squared error of prediction (as computed in the CV)}
 #'   \item{cor}{Canonical covariances}
+#'   \item{lambda_x}{Alias of the selected `lambda`}
+#'   \item{lambda_x_se}{Foldwise standard error at the selected `lambda`}
+#'   \item{lambda_y}{Placeholder for symmetry with two-penalty interfaces}
+#'   \item{lambda_y_se}{Placeholder for symmetry with two-penalty interfaces}
+#'   \item{resultsx}{Backward-compatible alias of `cv_summary`}
+#'   \item{cv_summary}{Data frame with one row per lambda containing mean RMSE and its foldwise standard error}
+#'   \item{cv_folds}{Data frame with fold-level RMSE values for each lambda}
+#'   \item{Lambda}{Canonical correlations from the final fit}
+#'   \item{B}{Estimated reduced-rank coefficient matrix from the final fit}
+#'   \item{fit}{Final fit at the selected lambda}
 #' }
 #' @importFrom foreach foreach %dopar%
 
@@ -567,13 +589,16 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
     V = final$V,
     lambda = opt_lambda,
     rmse = cv_summary$rmse,
-    cor = sapply(1:r, function(i) cov(X %*% final$U[, i], Y %*% final$V[, i])),
+    cor = final$cor,
     lambda_x = opt_lambda,
-    lambda_y = NA_real_,
     lambda_x_se = cv_summary$se[match(opt_lambda, cv_summary$lambda)],
+    lambda_y = NA_real_,
     lambda_y_se = NA_real_,
+    resultsx = cv_summary,
     cv_summary = cv_summary,
     cv_folds = cv_folds,
+    Lambda = final$Lambda,
+    B = final$B_opt,
     fit = final
   )
 }
@@ -609,6 +634,8 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
 #'   \item{V}{Canonical direction matrix for Y (q x r)}
 #'   \item{cor}{Canonical covariances}
 #'   \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
+#'   \item{Lambda}{Canonical correlations}
+#'   \item{B_opt}{Estimated reduced-rank coefficient matrix}
 #' }
 #' @export
 cca_graph_rrr <- function(X, Y, Gamma,

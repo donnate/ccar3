@@ -1,5 +1,11 @@
 library(ccar3)
 
+expected_cv_names <- c(
+  "U", "V", "lambda", "rmse", "cor",
+  "lambda_x", "lambda_x_se", "lambda_y", "lambda_y_se",
+  "resultsx", "cv_summary", "cv_folds", "Lambda", "B", "fit"
+)
+
 test_that("cca_graph_rrr_cv returns correct output structure", {
   set.seed(123)
   skip_if_not_installed("igraph")
@@ -21,7 +27,7 @@ test_that("cca_graph_rrr_cv returns correct output structure", {
   result <- cca_graph_rrr_cv(X, Y, Gamma=Gamma, r = r, kfolds=3, parallelize = FALSE)
   
   expect_type(result, "list")
-  expect_true(all(c("U", "V", "rmse", "cor") %in% names(result)))
+  expect_identical(names(result), expected_cv_names)
   expect_equal(dim(result$U)[2], r)
   expect_equal(dim(result$V)[2], r)
   expect_equal(dim(result$U)[1], dim(X)[2])
@@ -105,5 +111,5 @@ test_that("cca_graph_rrr_cv accepts preprocessing mode and sparse Gamma", {
   )
 
   expect_type(result, "list")
-  expect_true(all(c("U", "V", "lambda", "rmse", "cor") %in% names(result)))
+  expect_identical(names(result), expected_cv_names)
 })

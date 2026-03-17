@@ -1,5 +1,11 @@
 library(ccar3)
 
+expected_cv_names <- c(
+  "U", "V", "lambda", "rmse", "cor",
+  "lambda_x", "lambda_x_se", "lambda_y", "lambda_y_se",
+  "resultsx", "cv_summary", "cv_folds", "Lambda", "B", "fit"
+)
+
 test_that("cca_group_rrr_cv returns correct output structure", {
   set.seed(123)
   r = 2
@@ -19,7 +25,7 @@ test_that("cca_group_rrr_cv returns correct output structure", {
   result <- cca_group_rrr_cv(X, Y, groups=groups, r = 2, kfolds=3, parallelize = FALSE)
   
   expect_type(result, "list")
-  expect_true(all(c("U", "V", "lambda", "rmse", "cor", "cv_summary", "cv_folds", "fit") %in% names(result)))
+  expect_identical(names(result), expected_cv_names)
   expect_equal(dim(result$U)[2], r)
   expect_equal(dim(result$V)[2], r)
   expect_equal(dim(result$U)[1], 100)
@@ -104,7 +110,7 @@ test_that("cca_group_rrr_cv supports preprocess modes and p > n", {
   )
 
   expect_type(result, "list")
-  expect_true(all(c("U", "V", "lambda", "rmse", "cor", "cv_summary", "cv_folds", "fit") %in% names(result)))
+  expect_identical(names(result), expected_cv_names)
 })
 
 test_that("cca_group_rrr_cv forwards matrix-free ADMM controls", {

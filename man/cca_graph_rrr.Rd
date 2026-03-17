@@ -66,6 +66,8 @@ A list with elements:
 \item{V}{Canonical direction matrix for Y (q x r)}
 \item{cor}{Canonical covariances}
 \item{loss}{The prediction error 1/n * \| XU - YV\|^2}
+\item{Lambda}{Canonical correlations}
+\item{B_opt}{Estimated reduced-rank coefficient matrix}
 }
 }
 \description{

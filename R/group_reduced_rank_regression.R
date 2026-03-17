@@ -308,8 +308,15 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 #'   \item{lambda}{Optimal regularisation parameter lambda chosen by CV}
 #'   \item{rmse}{Mean squared error of prediction (as computed in the CV)}
 #'   \item{cor}{Canonical covariances}
+#'   \item{lambda_x}{Alias of the selected `lambda`}
+#'   \item{lambda_x_se}{Foldwise standard error at the selected `lambda`}
+#'   \item{lambda_y}{Placeholder for symmetry with two-penalty interfaces}
+#'   \item{lambda_y_se}{Placeholder for symmetry with two-penalty interfaces}
+#'   \item{resultsx}{Backward-compatible alias of `cv_summary`}
 #'   \item{cv_summary}{Data frame with one row per lambda containing mean RMSE and its foldwise standard error}
 #'   \item{cv_folds}{Data frame with fold-level RMSE values for each lambda}
+#'   \item{Lambda}{Canonical correlations from the final fit}
+#'   \item{B}{Estimated reduced-rank coefficient matrix from the final fit}
 #'   \item{fit}{Final fit at the selected lambda}
 #' }
 #' @importFrom foreach foreach %dopar%
@@ -470,13 +477,13 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
     cor = final$cor,
     lambda_x = opt_lambda,
     lambda_x_se = cv_summary$se[match(opt_lambda, cv_summary$lambda)],
-    resultsx = cv_summary,
-    Lambda = final$Lambda,
-    B = final$B_opt,
     lambda_y = NA_real_,
     lambda_y_se = NA_real_,
+    resultsx = cv_summary,
     cv_summary = cv_summary,
     cv_folds = cv_folds,
+    Lambda = final$Lambda,
+    B = final$B_opt,
     fit = final
   )
 }
