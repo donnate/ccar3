@@ -2,6 +2,7 @@ library(magrittr)
 library(tidyr)
 library(pracma) # Required for pinv
 library(caret) # Required for createFolds
+library(foreach)
 
 .resolve_preprocess_mode <- function(standardize = NULL, preprocess = NULL) {
   if (!is.null(preprocess)) {

@@ -215,7 +215,9 @@ solve_rrr_admm <- function(X, tilde_Y, Sx, lambda, rho=1, niter=10, thresh, verb
 
 
 # Helper: CVXR-based group sparse solver
-solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
+solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
+                           rho = 1, niter = 1e4, thresh = 1e-4,
+                           verbose = FALSE) {
   if (!requireNamespace("CVXR", quietly = TRUE)) {
     stop("Package 'CVXR' must be installed to use the CVX solver.",
          call. = FALSE)
@@ -223,11 +225,46 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
 
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
-  B <- CVXR::Variable(p, q)
+
+  fallback_admm <- function(reason = NULL) {
+    if (verbose && !is.null(reason)) {
+      message("Falling back to ADMM from CVXR: ", reason)
+    }
+    Sx <- if (p > n) NULL else crossprod(X) / n
+    solve_rrr_admm(
+      X, tilde_Y, Sx = Sx, lambda = lambda, rho = rho,
+      niter = niter, thresh = thresh, thresh_0 = thresh_0,
+      verbose = verbose
+    )
+  }
+
+  # CVXR becomes impractical quickly because canonicalization densifies the
+  # quadratic objective. For larger problems, the ADMM path is both faster and
+  # dramatically more memory efficient.
+  if (n * p * q > 5e6) {
+    return(fallback_admm("problem size is too large for CVXR canonicalization"))
+  }
+
+  B <- CVXR::Variable(c(p, q))
   
-  objective <- CVXR::Minimize(1 / n * CVXR::sum_squares(tilde_Y - X %*% B) + lambda * sum(CVXR::norm2(B, axis = 1)))
-  result <- CVXR::solve(CVXR::Problem(objective))
-  B_opt <- result$getValue(B)
+  row_penalty <- Reduce(
+    `+`,
+    lapply(seq_len(p), function(j) CVXR::norm(B[j, , drop = FALSE], 2))
+  )
+  objective <- CVXR::Minimize(
+    1 / n * CVXR::sum_squares(tilde_Y - X %*% B) + lambda * row_penalty
+  )
+  B_opt <- tryCatch({
+    problem <- CVXR::Problem(objective)
+    result <- solve(problem)
+    result$getValue(B)
+  }, error = function(e) {
+    msg <- conditionMessage(e)
+    if (grepl("memory|vector memory|sparse->dense|cannot allocate", msg, ignore.case = TRUE)) {
+      return(fallback_admm(msg))
+    }
+    stop(e)
+  })
   
   B_opt[abs(B_opt) < thresh_0] <- 0
   return(B_opt)
@@ -247,7 +284,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6) {
 #' @param highdim Boolean for high-dimensional regime.
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
-#' @param standardize Logical; should X and Y be scaled.
+#' @param standardize Logical; should X and Y be centered and scaled. If FALSE, they will be centered but not scaled.
 #' @param rho ADMM parameter.
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
@@ -277,8 +314,8 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   n <- nrow(X)
   p <- ncol(X)
   
-  X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
-  Y <- if (standardize) scale(Y) else Y # scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) else scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
   
   use_highdim <- isTRUE(highdim) || p > n
   skip_Sx <- use_highdim && is.null(Sx) && p > n
@@ -292,12 +329,15 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   tilde_Y <- Y %*% sqrt_inv_Sy
   
   if (!use_highdim) {
-    if(verbose){print("Not using highdim")}
+    if (verbose) print("Not using highdim")
     B_fit <- solve(Sx, crossprod(X, tilde_Y) / n)
   } else {
     if (solver == "CVX") {
       if(verbose){ print("Using CVX solver")}
-      B_fit <- solve_rrr_cvxr(X, tilde_Y, lambda, thresh_0=thresh_0) 
+      B_fit <- solve_rrr_cvxr(
+        X, tilde_Y, lambda, thresh_0 = thresh_0,
+        rho = rho, niter = niter, thresh = thresh, verbose = verbose
+      )
     } else if (solver == "ADMM") {
       if(verbose){print("Using ADMM solver")}
       B_fit <- solve_rrr_admm(X, tilde_Y, Sx, lambda=lambda, rho=rho, niter=niter, thresh=thresh, thresh_0=thresh_0,
@@ -309,10 +349,11 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
               call. = FALSE)
         }
       fit <- rrpack::cv.srrr(tilde_Y, X, nrank = r, method = "glasso", nfold = 2,
-                             modstr = list("lamA" = rep(lambda, 10), "nlam" = 10))
+                              modstr = list("lamA" = rep(lambda, 10), "nlam" = 10))
       B_fit <- fit$coef
     }
   }
+  
   B_fit[abs(B_fit) < thresh_0] <- 0
   post <- .postprocess_rrr_fit(
     B_fit, X, Y, sqrt_inv_Sy, r,
@@ -320,7 +361,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
     thresh_0 = thresh_0,
     verbose = verbose
   )
-  
+
   list(U = post$U, V = post$V, Lambda = post$Lambda, loss = post$loss, cor = post$cor, B_opt = B_fit)
 }
 
@@ -372,8 +413,8 @@ cca_rrr_cv <- function(X, Y,
                        thresh = 1e-4, verbose=FALSE,
                        nb_cores = NULL) {
   
-  X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
-  Y <- if (standardize) scale(Y) else Y #scale(Y, scale = FALSE)
+  X <- if (standardize) scale(X) else scale(X, scale = FALSE)
+  Y <- if (standardize) scale(Y) else scale(Y, scale = FALSE)
   n <- nrow(X)
   p <- ncol(X)
   Sx <- if (p > n) NULL else matmul(t(X), X) / n

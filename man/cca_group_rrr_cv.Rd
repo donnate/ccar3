@@ -39,10 +39,13 @@ cca_group_rrr_cv(
 
 \item{parallelize}{Whether to use parallel processing (default is FALSE)}
 
+<<<<<<< HEAD
+=======
 \item{standardize}{Backward-compatible preprocessing flag: TRUE = \code{"scale"}, FALSE = \code{"center"}.}
 
 \item{preprocess}{Preprocessing mode. One of \code{"scale"} (center + scale), \code{"center"} (center only), or \code{"none"}.}
 
+>>>>>>> 7717ca602e9579bb5c3ffe5997cbff745a9547e6
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)}
 
 \item{solver}{Either "ADMM" or "CVXR"}
