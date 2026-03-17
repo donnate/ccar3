@@ -36,6 +36,246 @@ library(foreach)
   M
 }
 
+.make_graph_invSx_apply <- function(A, rho, ridge = 1e-8, verbose = FALSE) {
+  A <- as.matrix(A)
+  n <- nrow(A)
+  p <- ncol(A)
+
+  if (p <= n) {
+    gram <- crossprod(A) + rho * diag(p)
+    R <- tryCatch(chol(gram + ridge * diag(p)), error = function(e) NULL)
+
+    solve_gram <- if (!is.null(R)) {
+      function(B) backsolve(R, forwardsolve(t(R), B))
+    } else {
+      if (verbose) message("Cholesky failed in graph ADMM solve; using solve().")
+      function(B) solve(gram, B)
+    }
+
+    return(list(
+      apply = function(rhs) solve_gram(as.matrix(rhs)),
+      uses_woodbury = FALSE
+    ))
+  }
+
+  K <- diag(n) + tcrossprod(A) / rho
+  R <- tryCatch(chol(K + ridge * diag(n)), error = function(e) NULL)
+
+  solve_K <- if (!is.null(R)) {
+    function(B) backsolve(R, forwardsolve(t(R), B))
+  } else {
+    if (verbose) message("Cholesky failed in graph Woodbury solve; using solve().")
+    function(B) solve(K, B)
+  }
+
+  list(
+    apply = function(rhs) {
+      rhs <- as.matrix(rhs)
+      middle <- solve_K(A %*% rhs)
+      rhs / rho - crossprod(A, middle) / (rho^2)
+    },
+    uses_woodbury = TRUE
+  )
+}
+
+.prepare_graph_cache <- function(Gamma, gamma_ridge, Gamma_dagger = NULL) {
+  if (is.null(Gamma_dagger)) {
+    if (!inherits(Gamma, "sparseMatrix")) {
+      Gamma <- Matrix::Matrix(Gamma, sparse = TRUE)
+    }
+
+    L_eps <- Matrix::crossprod(Gamma) + gamma_ridge * Matrix::Diagonal(n = ncol(Gamma))
+    L_fac <- Matrix::Cholesky(L_eps, LDL = FALSE)
+
+    solve_L <- function(rhs) {
+      as.matrix(Matrix::solve(L_fac, rhs, system = "A"))
+    }
+
+    return(list(
+      mode = "regularized",
+      Gamma = Gamma,
+      gamma_ridge = gamma_ridge,
+      solve_L = solve_L
+    ))
+  }
+
+  list(
+    mode = "explicit",
+    Gamma = Gamma,
+    Gamma_dagger = Gamma_dagger,
+    gamma_ridge = gamma_ridge
+  )
+}
+
+.transform_graph_design <- function(graph_cache, X = NULL, solved_tX = NULL) {
+  if (graph_cache$mode == "regularized") {
+    if (is.null(solved_tX)) {
+      if (is.null(X)) stop("Either `X` or `solved_tX` must be provided.", call. = FALSE)
+      solved_tX <- graph_cache$solve_L(t(X))
+    }
+
+    return(list(
+      XGamma_dagger = as.matrix(Matrix::t(graph_cache$Gamma %*% solved_tX)),
+      XPi = graph_cache$gamma_ridge * t(solved_tX),
+      solved_tX = solved_tX
+    ))
+  }
+
+  if (is.null(X)) {
+    stop("`X` must be provided when using an explicit Gamma_dagger.", call. = FALSE)
+  }
+
+  XGamma_dagger <- as.matrix(X %*% graph_cache$Gamma_dagger)
+  list(
+    XGamma_dagger = XGamma_dagger,
+    XPi = as.matrix(X - XGamma_dagger %*% graph_cache$Gamma)
+  )
+}
+
+.reconstruct_graph_coefficients <- function(graph_cache, B, Projection) {
+  if (graph_cache$mode == "regularized") {
+    return(list(
+      gamma_dagger_B = graph_cache$solve_L(crossprod(graph_cache$Gamma, B)),
+      Pi_projection = graph_cache$gamma_ridge * graph_cache$solve_L(Projection)
+    ))
+  }
+
+  list(
+    gamma_dagger_B = graph_cache$Gamma_dagger %*% B,
+    Pi_projection = Projection - as.matrix(graph_cache$Gamma_dagger %*% (graph_cache$Gamma %*% Projection))
+  )
+}
+
+.fit_graph_rrr_preprocessed <- function(X, Y,
+                                        Sx = NULL, Sy = NULL,
+                                        lambda = 0, r,
+                                        LW_Sy = TRUE, rho = 10,
+                                        niter = 1e4, thresh = 1e-4,
+                                        thresh_0 = 1e-6,
+                                        verbose = FALSE,
+                                        graph_cache,
+                                        graph_design = NULL) {
+  n <- nrow(X)
+  p <- ncol(X)
+  q <- ncol(Y)
+
+  if (q > n) {
+    stop("The X/Y swapping heuristic (for q > n) is not compatible with the graph constraint Gamma. Swap X and Y in your arguments.")
+  }
+
+  if (n < min(p, q)) {
+    warning("Both X and Y are high dimensional; method may be unstable.")
+  }
+
+  fro_norm <- function(M) sqrt(sum(M^2))
+
+  sx_svd <- NULL
+  if (is.null(Sx)) {
+    if (p > n) {
+      # For p > n, avoid explicitly forming p x p covariance.
+      sx_svd <- svd(X / sqrt(n))
+    } else {
+      Sx <- crossprod(X) / n
+    }
+  }
+
+  if (is.null(Sy)) {
+    Sy <- crossprod(Y) / n
+    if (LW_Sy) Sy <- as.matrix(corpcor::cov.shrink(Y))
+  }
+
+  svd_Sy <- svd(as.matrix(Sy))
+  sqrt_inv_Sy <- svd_Sy$u %*% diag(ifelse(svd_Sy$d > 1e-4, 1 / sqrt(svd_Sy$d), 0)) %*% t(svd_Sy$v)
+  tilde_Y <- Y %*% sqrt_inv_Sy
+
+  if (is.null(graph_design)) {
+    graph_design <- .transform_graph_design(graph_cache, X = X)
+  }
+
+  XGamma_dagger <- graph_design$XGamma_dagger
+  XPi <- graph_design$XPi
+
+  Projection <- tryCatch(
+    qr.solve(XPi, tilde_Y),
+    error = function(e) {
+      XtX <- crossprod(XPi) + graph_cache$gamma_ridge * diag(ncol(XPi))
+      solve(XtX, crossprod(XPi, tilde_Y))
+    }
+  )
+  new_Ytilde <- tilde_Y - XPi %*% Projection
+
+  if (verbose) {
+    cat("Norm of Projection:", fro_norm(Projection), "\n")
+  }
+
+  new_p <- ncol(XGamma_dagger)
+  prod_xy <- crossprod(XGamma_dagger, new_Ytilde) / n
+  invSx_info <- .make_graph_invSx_apply(XGamma_dagger / sqrt(n), rho, verbose = verbose)
+  solve_invSx <- invSx_info$apply
+
+  U_dual <- matrix(0, new_p, q)
+  Z <- matrix(0, new_p, q)
+  B <- matrix(0, new_p, q)
+
+  for (i in seq_len(niter)) {
+    Z_old <- Z
+
+    B <- solve_invSx(prod_xy + rho * (Z - U_dual))
+    Z <- B + U_dual
+
+    norms <- sqrt(rowSums(Z^2))
+    shrink_factors <- pmax(0, 1 - lambda / (rho * norms))
+    shrink_factors[is.nan(shrink_factors)] <- 0
+    Z <- Z * shrink_factors
+
+    U_dual <- U_dual + B - Z
+
+    primal <- fro_norm(Z - B)
+    dual <- fro_norm(Z_old - Z)
+    if (verbose) {
+      cat("ADMM iter:", i, "Primal:", primal, "Dual:", dual, "\n")
+    }
+    if (max(primal / sqrt(new_p), dual / sqrt(new_p)) < thresh) break
+  }
+
+  reconstruction <- .reconstruct_graph_coefficients(graph_cache, B, Projection)
+  gamma_dagger_B <- reconstruction$gamma_dagger_B
+  Pi_projection <- reconstruction$Pi_projection
+
+  B_opt <- gamma_dagger_B + Pi_projection
+  B_opt[abs(B_opt) < thresh_0] <- 0
+
+  if (verbose) {
+    cat("Norm of Pi Projection:", fro_norm(Pi_projection), "\n")
+    cat("Norm of Gamma_dagger %*% B:", fro_norm(gamma_dagger_B), "\n")
+    cat("Norm of XPi:", fro_norm(XPi), "\n")
+    cat("rank of XPi:", qr(XPi)$rank, "\n")
+  }
+
+  if (!is.null(sx_svd)) {
+    sqrt_Sx_B <- sx_svd$v %*% (sx_svd$d * crossprod(sx_svd$v, B_opt))
+  } else {
+    svd_Sx <- svd(as.matrix(Sx))
+    sqrt_Sx_B <- svd_Sx$u %*% (sqrt(pmax(svd_Sx$d, 0)) * crossprod(svd_Sx$u, B_opt))
+  }
+
+  sol <- svd(sqrt_Sx_B)
+  if (verbose) {
+    cat("Singular values of sqrt(Sx) %*% B:\n")
+    print(sol$d)
+  }
+  V <- sqrt_inv_Sy %*% sol$v[, 1:r]
+  inv_D <- diag(ifelse(sol$d[1:r] > 1e-4, 1 / sol$d[1:r], 0))
+  U <- B_opt %*% sol$v[, 1:r] %*% inv_D
+
+  list(
+    U = U,
+    V = V,
+    loss = mean((Y %*% V - X %*% U)^2),
+    cor = sapply(1:r, function(i) cov(X %*% U[, i], Y %*% V[, i]))
+  )
+}
+
 
 cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                                 Sx = NULL, Sy = NULL, kfolds = 5,
@@ -46,6 +286,8 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                                 niter = 1e4, thresh = 1e-4,
                                 thresh_0 = 1e-6,
                                 Gamma_dagger = NULL,
+                                graph_cache = NULL,
+                                solved_tX = NULL,
                                 folds = NULL,
                                 return_fold_values = FALSE) {
   preprocess_mode <- .resolve_preprocess_mode(standardize = standardize, preprocess = preprocess)
@@ -64,23 +306,42 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
     n_train <- n_full - nrow(X_val)
 
     # --- DOWNDATE TRICK ---
-    #Sx_train <- if (is.null(Sx)) NULL else (n_full * Sx - crossprod(X_val)) / n_train
-    #Sy_train <- if (is.null(Sy)) NULL else (n_full * Sy - crossprod(Y_val)) / n_train
+    Sx_train <- if (is.null(Sx)) NULL else (n_full * Sx - crossprod(X_val)) / n_train
+    Sy_train <- if (is.null(Sy)) NULL else (n_full * Sy - crossprod(Y_val)) / n_train
 
 
     
     tryCatch({
-      fit <- cca_graph_rrr(X_train, Y_train, Gamma,
-                           Sx = NULL, Sy = NULL,
-                           lambda = lambda, r = r,
-                           standardize = standardize, preprocess = preprocess_mode,
-                           LW_Sy = LW_Sy, rho = rho, niter = niter, thresh = thresh,
-                           thresh_0 = thresh_0,
-                           Gamma_dagger = Gamma_dagger)
+      if (!is.null(graph_cache)) {
+        graph_design <- if (!is.null(solved_tX) && graph_cache$mode == "regularized") {
+          .transform_graph_design(
+            graph_cache,
+            solved_tX = solved_tX[, -folds[[i]], drop = FALSE]
+          )
+        } else {
+          NULL
+        }
 
-      print(paste("Fold completed", i, ". Evaluating on validation set..."))
-      print(colMeans(X_val %*% fit$U))
-      print(colMeans(Y_val %*% fit$V))
+        fit <- .fit_graph_rrr_preprocessed(
+          X_train, Y_train,
+          Sx = Sx_train, Sy = Sy_train,
+          lambda = lambda, r = r,
+          LW_Sy = LW_Sy, rho = rho,
+          niter = niter, thresh = thresh,
+          thresh_0 = thresh_0,
+          verbose = FALSE,
+          graph_cache = graph_cache,
+          graph_design = graph_design
+        )
+      } else {
+        fit <- cca_graph_rrr(X_train, Y_train, Gamma,
+                             Sx = Sx_train, Sy = Sy_train,
+                             lambda = lambda, r = r,
+                             standardize = standardize, preprocess = preprocess_mode,
+                             LW_Sy = LW_Sy, rho = rho, niter = niter, thresh = thresh,
+                             thresh_0 = thresh_0,
+                             Gamma_dagger = Gamma_dagger)
+      }
 
       sqrt(mean((X_val %*% fit$U - Y_val %*% fit$V)^2))
     }, error = function(e) {
@@ -150,6 +411,13 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   X <- .preprocess_matrix(X, preprocess_mode)
   Y <- .preprocess_matrix(Y, preprocess_mode)
 
+  n <- nrow(X)
+  Sx <- if (ncol(X) > n) NULL else crossprod(X) / n
+  Sy <- if (LW_Sy) NULL else crossprod(Y) / n
+  graph_cache <- .prepare_graph_cache(Gamma, max(thresh_0, 1e-6), Gamma_dagger = Gamma_dagger)
+  solved_tX <- if (graph_cache$mode == "regularized") graph_cache$solve_L(t(X)) else NULL
+  full_graph_design <- if (!is.null(solved_tX)) .transform_graph_design(graph_cache, solved_tX = solved_tX) else NULL
+
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
 
   safe_mean <- function(x) {
@@ -165,7 +433,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   run_cv <- function(lambda) {
     fold_values <- cca_graph_rrr_cv_folds(
       X, Y, Gamma,
-      Sx = NULL, Sy = NULL,
+      Sx = Sx, Sy = Sy,
       kfolds = kfolds,
       lambda = lambda, r = r,
       preprocess = "none",
@@ -173,6 +441,8 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
       niter = niter, thresh = thresh,
       thresh_0 = thresh_0,
       Gamma_dagger = Gamma_dagger,
+      graph_cache = graph_cache,
+      solved_tX = solved_tX,
       folds = folds,
       return_fold_values = TRUE
     )
@@ -247,11 +517,16 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   opt_lambda <- cv_summary$lambda[which.min(cv_summary$rmse)]
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
 
-  final <- cca_graph_rrr(X, Y, Gamma, Sx = NULL, Sy = NULL,
-                         lambda = opt_lambda, r = r,
-                         preprocess = "none",
-                         LW_Sy = LW_Sy, rho = rho, niter = niter,
-                         thresh = thresh, Gamma_dagger = Gamma_dagger, thresh_0=thresh_0)
+  final <- .fit_graph_rrr_preprocessed(
+    X, Y,
+    Sx = Sx, Sy = Sy,
+    lambda = opt_lambda, r = r,
+    LW_Sy = LW_Sy, rho = rho, niter = niter,
+    thresh = thresh, thresh_0 = thresh_0,
+    verbose = verbose,
+    graph_cache = graph_cache,
+    graph_design = full_graph_design
+  )
 
   list(
     U = final$U,
@@ -314,170 +589,15 @@ cca_graph_rrr <- function(X, Y, Gamma,
   preprocess_mode <- .resolve_preprocess_mode(standardize = standardize, preprocess = preprocess)
   X <- .preprocess_matrix(X, preprocess_mode)
   Y <- .preprocess_matrix(Y, preprocess_mode)
-
-  n <- nrow(X)
-  p <- ncol(X)
-  q <- ncol(Y)
-
-  if (q > n) {
-    stop("The X/Y swapping heuristic (for q > n) is not compatible with the graph constraint Gamma. Swap X and Y in your arguments.")
-  }
-
-  if (n < min(p, q)) {
-    warning("Both X and Y are high dimensional; method may be unstable.")
-  }
-
-  fro_norm <- function(M) sqrt(sum(M^2))
-
-  sx_svd <- NULL
-  if (is.null(Sx)) {
-    if (p > n) {
-      # For p > n, avoid explicitly forming p x p covariance.
-      sx_svd <- svd(X / sqrt(n))
-    } else {
-      Sx <- crossprod(X) / n
-    }
-  }
-
-  if (is.null(Sy)) {
-    Sy <- crossprod(Y) / n
-    if (LW_Sy) Sy <- as.matrix(corpcor::cov.shrink(Y))
-  }
-
-  # Inverse square root of Sy
-  svd_Sy <- svd(as.matrix(Sy))
-  sqrt_inv_Sy <- svd_Sy$u %*% diag(ifelse(svd_Sy$d > 1e-4, 1 / sqrt(svd_Sy$d), 0)) %*% t(svd_Sy$v)
-  tilde_Y <- Y %*% sqrt_inv_Sy
-
-  gamma_ridge <- max(thresh_0, 1e-6)
-
-  if (is.null(Gamma_dagger)) {
-    if (!inherits(Gamma, "sparseMatrix")) {
-      Gamma <- Matrix::Matrix(Gamma, sparse = TRUE)
-    }
-
-    L_eps <- Matrix::crossprod(Gamma) + gamma_ridge * Matrix::Diagonal(n = ncol(Gamma))
-    L_fac <- Matrix::Cholesky(L_eps, LDL = FALSE)
-
-    solve_L <- function(rhs) {
-      as.matrix(Matrix::solve(L_fac, rhs, system = "A"))
-    }
-
-    # Apply the regularized pseudoinverse without explicitly forming it.
-    XGamma_dagger <- as.matrix(Matrix::t(Gamma %*% solve_L(t(X))))
-
-    # XPi = X (I - Gamma^dagger Gamma) = gamma_ridge * X (Gamma'Gamma + gamma_ridge I)^(-1)
-    XPi <- gamma_ridge * t(solve_L(t(X)))
-  } else {
-    XGamma_dagger <- as.matrix(X %*% Gamma_dagger)
-    XPi <- as.matrix(X - XGamma_dagger %*% Gamma)
-    solve_L <- NULL
-  }
-
-  # Remove projection on Pi
-  Projection <- tryCatch(
-    qr.solve(XPi, tilde_Y),
-    error = function(e) {
-      XtX <- crossprod(XPi) + gamma_ridge * diag(ncol(XPi))
-      solve(XtX, crossprod(XPi, tilde_Y))
-    }
-  )
-  new_Ytilde <- tilde_Y - XPi %*% Projection
-  if (verbose) {
-    cat("Norm of Projection:", fro_norm(Projection), "
-")
-  }
-
-  # ADMM initialization
-  new_p <- ncol(XGamma_dagger)
-  prod_xy <- crossprod(XGamma_dagger, new_Ytilde) / n
-
-  if (is.null(Gamma_dagger)) {
-    A <- XGamma_dagger / sqrt(n)
-    K <- diag(nrow(A)) + tcrossprod(A) / rho
-    solve_invSx <- function(rhs) {
-      rhs <- as.matrix(rhs)
-      tmp <- A %*% rhs
-      middle <- solve(K, tmp)
-      rhs / rho - crossprod(A, middle) / (rho^2)
-    }
-  } else {
-    invSx <- solve(crossprod(XGamma_dagger) / n + rho * diag(new_p))
-    solve_invSx <- function(rhs) invSx %*% rhs
-  }
-
-  U_dual <- matrix(0, new_p, q)
-  Z <- matrix(0, new_p, q)
-  B <- matrix(0, new_p, q)
-
-  for (i in seq_len(niter)) {
-    Z_old <- Z
-
-    B <- solve_invSx(prod_xy + rho * (Z - U_dual))
-    Z <- B + U_dual
-
-    # Group soft-thresholding
-    norms <- sqrt(rowSums(Z^2))
-    shrink_factors <- pmax(0, 1 - lambda / (rho * norms))
-    shrink_factors[is.nan(shrink_factors)] <- 0
-    Z <- Z * shrink_factors
-
-    U_dual <- U_dual + B - Z
-
-    primal <- fro_norm(Z - B)
-    dual <- fro_norm(Z_old - Z)
-    if (verbose) {
-      cat("ADMM iter:", i, "Primal:", primal, "Dual:", dual, "
-")
-    }
-    if (max(primal / sqrt(new_p), dual / sqrt(new_p)) < thresh) break
-  }
-
-  # Reconstruct full coefficient matrix
-  if (is.null(Gamma_dagger)) {
-    gamma_dagger_B <- solve_L(crossprod(Gamma, B))
-    Pi_projection <- gamma_ridge * solve_L(Projection)
-  } else {
-    gamma_dagger_B <- Gamma_dagger %*% B
-    Pi_projection <- Projection - as.matrix(Gamma_dagger %*% (Gamma %*% Projection))
-  }
-
-  B_opt <- gamma_dagger_B + Pi_projection
-  B_opt[abs(B_opt) < thresh_0] <- 0
-
-  if (verbose) {
-    cat("Norm of Pi Projection:", fro_norm(Pi_projection), "
-")
-    cat("Norm of Gamma_dagger %*% B:", fro_norm(gamma_dagger_B), "
-")
-    cat("Norm of XPi:", fro_norm(XPi), "
-")
-    cat("rank of XPi:", qr(XPi)$rank, "
-")
-  }
-
-  # Final CCA step: apply sqrt(Sx) without explicitly building Sx when p > n.
-  if (!is.null(sx_svd)) {
-    sqrt_Sx_B <- sx_svd$v %*% (sx_svd$d * crossprod(sx_svd$v, B_opt))
-  } else {
-    svd_Sx <- svd(as.matrix(Sx))
-    sqrt_Sx_B <- svd_Sx$u %*% (sqrt(pmax(svd_Sx$d, 0)) * crossprod(svd_Sx$u, B_opt))
-  }
-
-  sol <- svd(sqrt_Sx_B)
-  if (verbose) {
-    cat("Singular values of sqrt(Sx) %*% B:
-")
-    print(sol$d)
-  }
-  V <- sqrt_inv_Sy %*% sol$v[, 1:r]
-  inv_D <- diag(ifelse(sol$d[1:r] > 1e-4, 1 / sol$d[1:r], 0))
-  U <- B_opt %*% sol$v[, 1:r] %*% inv_D
-
-  list(
-    U = U,
-    V = V,
-    loss = mean((Y %*% V - X %*% U)^2),
-    cor = sapply(1:r, function(i) cov(X %*% U[, i], Y %*% V[, i]))
+  graph_cache <- .prepare_graph_cache(Gamma, max(thresh_0, 1e-6), Gamma_dagger = Gamma_dagger)
+  .fit_graph_rrr_preprocessed(
+    X, Y,
+    Sx = Sx, Sy = Sy,
+    lambda = lambda, r = r,
+    LW_Sy = LW_Sy, rho = rho,
+    niter = niter, thresh = thresh,
+    thresh_0 = thresh_0,
+    verbose = verbose,
+    graph_cache = graph_cache
   )
 }
