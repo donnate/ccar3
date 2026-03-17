@@ -3,6 +3,146 @@ library(dplyr)
 library(magrittr)
 library(foreach)
 
+.rrr_chol_jitter <- function(G, jitter = 1e-8, max_tries = 6) {
+  p <- nrow(G)
+  for (k in 0:max_tries) {
+    out <- tryCatch(
+      chol(G + (10^k) * jitter * diag(p)),
+      error = function(e) NULL
+    )
+    if (!is.null(out)) return(out)
+  }
+  stop("chol() failed even with jitter.")
+}
+
+.rrr_invsqrt_psd <- function(G, eps = 1e-8) {
+  G <- (G + t(G)) / 2
+  ed <- eigen(G, symmetric = TRUE)
+  vals <- pmax(ed$values, eps)
+  ed$vectors %*% diag(1 / sqrt(vals), nrow = length(vals)) %*% t(ed$vectors)
+}
+
+.rrr_whiten_factor <- function(G, ridge = 1e-8, verbose = FALSE) {
+  if (any(!is.finite(G))) {
+    if (verbose) cat("\nNon-finite entries in whitening Gram matrix; sanitizing.\n")
+    G[!is.finite(G)] <- 0
+    G <- (G + t(G)) / 2 + ridge * diag(nrow(G))
+  }
+
+  tryCatch({
+    R <- .rrr_chol_jitter(G, jitter = ridge)
+    backsolve(R, diag(nrow(G)))
+  }, error = function(e) {
+    if (verbose) cat("\nchol_jitter failed; using eigen whitening fallback.\n")
+    .rrr_invsqrt_psd(G, eps = ridge)
+  })
+}
+
+.rrr_safe_rank_svd <- function(M, k, prefer_sparse = FALSE) {
+  if (k < 1) return(NULL)
+  nr <- nrow(M)
+  nc <- ncol(M)
+  if (nr < 1 || nc < 1) return(NULL)
+  k <- min(k, nr, nc)
+
+  out <- NULL
+
+  if (requireNamespace("RSpectra", quietly = TRUE) && k < min(nr, nc)) {
+    out <- tryCatch({
+      if (prefer_sparse && requireNamespace("Matrix", quietly = TRUE)) {
+        RSpectra::svds(Matrix::Matrix(M, sparse = TRUE), k)
+      } else {
+        RSpectra::svds(M, k)
+      }
+    }, error = function(e) NULL)
+
+    if (!is.null(out)) {
+      ok <- all(is.finite(out$u)) && all(is.finite(out$v)) && all(is.finite(out$d))
+      if (!ok) out <- NULL
+    }
+  }
+
+  if (is.null(out)) {
+    out <- tryCatch(svd(as.matrix(M), nu = k, nv = k), error = function(e) NULL)
+    if (is.null(out)) return(NULL)
+    out$u <- out$u[, seq_len(k), drop = FALSE]
+    out$v <- out$v[, seq_len(k), drop = FALSE]
+    out$d <- out$d[seq_len(k)]
+  }
+
+  out
+}
+
+.postprocess_rrr_fit <- function(Bhat, X, Y, sqrt_inv_Sy, r,
+                                 ridge_whiten = 1e-8, thresh_0 = 1e-6,
+                                 verbose = FALSE) {
+  n <- nrow(X)
+  p <- ncol(X)
+  q <- ncol(Y)
+
+  if (all(abs(Bhat) < thresh_0)) {
+    XU <- matrix(0, n, r)
+    YV <- matrix(0, n, r)
+    return(list(
+      U = matrix(0, p, r),
+      V = matrix(0, q, r),
+      Lambda = rep(0, r),
+      cor = rep(0, r),
+      loss = mean((YV - XU)^2)
+    ))
+  }
+
+  r_eff <- min(r, nrow(Bhat), ncol(Bhat))
+  SVDs <- .rrr_safe_rank_svd(Bhat, r_eff, prefer_sparse = TRUE)
+  if (is.null(SVDs)) {
+    stop("SVD failed during reduced-rank postprocessing.", call. = FALSE)
+  }
+
+  U0 <- SVDs$u
+  V0 <- sqrt_inv_Sy %*% SVDs$v
+
+  XU0 <- X %*% U0
+  YV0 <- Y %*% V0
+
+  GX <- crossprod(XU0) / n + ridge_whiten * diag(r_eff)
+  GY <- crossprod(YV0) / n + ridge_whiten * diag(r_eff)
+
+  U <- U0 %*% .rrr_whiten_factor(GX, ridge = ridge_whiten, verbose = verbose)
+  V <- V0 %*% .rrr_whiten_factor(GY, ridge = ridge_whiten, verbose = verbose)
+
+  XU <- X %*% U
+  YV <- Y %*% V
+  cor <- diag(crossprod(XU, YV) / n)
+
+  neg <- cor < 0
+  if (any(neg)) {
+    V[, neg] <- -V[, neg, drop = FALSE]
+    YV[, neg] <- -YV[, neg, drop = FALSE]
+    cor[neg] <- -cor[neg]
+  }
+
+  ord <- order(cor, decreasing = TRUE)
+  cor <- cor[ord]
+  U <- U[, ord, drop = FALSE]
+  V <- V[, ord, drop = FALSE]
+  XU <- XU[, ord, drop = FALSE]
+  YV <- YV[, ord, drop = FALSE]
+
+  if (r_eff < r) {
+    U <- cbind(U, matrix(0, p, r - r_eff))
+    V <- cbind(V, matrix(0, q, r - r_eff))
+    cor <- c(cor, rep(0, r - r_eff))
+  }
+
+  list(
+    U = U,
+    V = V,
+    Lambda = cor,
+    cor = cor,
+    loss = mean((YV - XU)^2)
+  )
+}
+
 
 # Helper: efficient (Sx + rho I)^{-1} * W without forming large Sx when p >> n
 make_invSx_apply <- function(X, Sx, rho, ridge = 1e-8, verbose = FALSE) {
@@ -136,12 +276,12 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   
   n <- nrow(X)
   p <- ncol(X)
-  q <- ncol(Y)
   
   X <- if (standardize) scale(X) else X #scale(X, scale = FALSE)
   Y <- if (standardize) scale(Y) else Y # scale(Y, scale = FALSE)
   
-  skip_Sx <- highdim && is.null(Sx) && p > n
+  use_highdim <- isTRUE(highdim) || p > n
+  skip_Sx <- use_highdim && is.null(Sx) && p > n
   if (is.null(Sx) && !skip_Sx) Sx <- crossprod(X) / n
   if (is.null(Sy)) {
     Sy <- crossprod(Y) / n
@@ -150,24 +290,17 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   
   sqrt_inv_Sy <- compute_sqrt_inv(Sy)
   tilde_Y <- Y %*% sqrt_inv_Sy
-  Sx_tot <- Sx
-  Sxy <- crossprod(X, tilde_Y) / n 
   
-  if (!highdim) {
+  if (!use_highdim) {
     if(verbose){print("Not using highdim")}
-    B_OLS <- solve(Sx_tot, Sxy)
-    sqrt_Sx <- compute_sqrt(Sx)
-    sqrt_inv_Sx <- compute_sqrt_inv(Sx)
-    sol <- svd(sqrt_Sx %*% B_OLS)
-    V <- sqrt_inv_Sy %*% sol$v[, 1:r]
-    U <- sqrt_inv_Sx %*% sol$u[, 1:r]
+    B_fit <- solve(Sx, crossprod(X, tilde_Y) / n)
   } else {
     if (solver == "CVX") {
       if(verbose){ print("Using CVX solver")}
-      B_opt <- solve_rrr_cvxr(X, tilde_Y, lambda, thresh_0=thresh_0) 
+      B_fit <- solve_rrr_cvxr(X, tilde_Y, lambda, thresh_0=thresh_0) 
     } else if (solver == "ADMM") {
       if(verbose){print("Using ADMM solver")}
-      B_opt <- solve_rrr_admm(X, tilde_Y, Sx, lambda=lambda, rho=rho, niter=niter, thresh=thresh, thresh_0=thresh_0,
+      B_fit <- solve_rrr_admm(X, tilde_Y, Sx, lambda=lambda, rho=rho, niter=niter, thresh=thresh, thresh_0=thresh_0,
                               verbose = FALSE)
     } else {
       if(verbose){print("Using gglasso solver")}
@@ -177,36 +310,18 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
         }
       fit <- rrpack::cv.srrr(tilde_Y, X, nrank = r, method = "glasso", nfold = 2,
                              modstr = list("lamA" = rep(lambda, 10), "nlam" = 10))
-      B_opt <- fit$coef
-    }
-    
-    B_opt[abs(B_opt) < thresh_0] <- 0
-    active_rows <- which(rowSums(B_opt^2) > 0)
-    if (length(active_rows) > r - 1) {
-      if (is.null(Sx)) {
-        Sx_active <- crossprod(X[, active_rows, drop = FALSE]) / n
-      } else {
-        Sx_active <- Sx[active_rows, active_rows, drop = FALSE]
-      }
-      sqrt_Sx <- compute_sqrt(Sx_active)
-      sol <- svd(sqrt_Sx %*% B_opt[active_rows, ])
-      V <- sqrt_inv_Sy %*% sol$v[, 1:r]
-      inv_D <- diag(sapply(sol$d[1:r], function(d) ifelse(d < 1e-4, 0, 1 / d)))
-      U <- B_opt %*% sol$v[, 1:r] %*% inv_D
-      Lambda = sol$d[1:r]
-    } else {
-      U <- matrix(0, p, r)
-      V <- matrix(0, q, r)
-      Lambda <- rep(0, r)
+      B_fit <- fit$coef
     }
   }
-  XU <- X %*% U
-  YV <- Y %*% V
-
-  cor <- diag(crossprod(XU, YV) / n)
-  loss <- mean((YV - XU)^2)
+  B_fit[abs(B_fit) < thresh_0] <- 0
+  post <- .postprocess_rrr_fit(
+    B_fit, X, Y, sqrt_inv_Sy, r,
+    ridge_whiten = max(thresh_0, 1e-8),
+    thresh_0 = thresh_0,
+    verbose = verbose
+  )
   
-  list(U = U, V = V, Lambda=Lambda, loss = loss, cor = cor)
+  list(U = post$U, V = post$V, Lambda = post$Lambda, loss = post$loss, cor = post$cor, B_opt = B_fit)
 }
 
 
@@ -262,14 +377,15 @@ cca_rrr_cv <- function(X, Y,
   n <- nrow(X)
   p <- ncol(X)
   Sx <- if (p > n) NULL else matmul(t(X), X) / n
-  Sy <- if (LW_Sy) as.matrix(corpcor::cov.shrink(Y, verbose = FALSE)) else crossprod(Y) / n
+  Sy <- if (LW_Sy) NULL else crossprod(Y) / n
+  folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   cv_function <- function(lambda) {
     #print(lambda)
-    cca_rrr_cv_folds(X, Y, Sx=Sx, Sy=NULL, kfolds=kfolds, 
+    cca_rrr_cv_folds(X, Y, Sx=Sx, Sy=Sy, kfolds=kfolds, 
                      LW_Sy = LW_Sy,
                      lambda=lambda, r=r, solver=solver, 
                      standardize=FALSE, rho=rho, niter=niter, thresh=thresh,
-                     thresh_0=thresh_0)
+                     thresh_0=thresh_0, folds = folds)
   }
   
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
@@ -373,8 +489,11 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                              LW_Sy = TRUE,
                              niter=1e4,
                              thresh_0=1e-6,
-                             thresh = 1e-4) {
-  folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
+                             thresh = 1e-4,
+                             folds = NULL) {
+  if (is.null(folds)) {
+    folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
+  }
   
   rmse <- foreach(i = seq_along(folds), .combine = c) %do% { 
     
@@ -388,9 +507,15 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
     } else {
       Sx_train <- NULL
     }
+
+    if (is.null(Sy) == FALSE) {
+      Sy_train <- (n * Sy - crossprod(Y_val)) / n_train
+    } else {
+      Sy_train <- NULL
+    }
     
     tryCatch({
-      final <- cca_rrr(X_train, Y_train, Sx=Sx_train, Sy=NULL, highdim=TRUE,
+      final <- cca_rrr(X_train, Y_train, Sx=Sx_train, Sy=Sy_train, highdim=TRUE,
                        lambda=lambda, r=r, solver=solver,
                        LW_Sy=LW_Sy, standardize=FALSE, rho=rho, niter=niter, 
                        thresh=thresh, thresh_0=thresh_0,
