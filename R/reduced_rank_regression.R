@@ -296,13 +296,21 @@ make_invSx_apply <- function(X, Sx = NULL, rho, ridge = 1e-8, verbose = FALSE,
 
 # Helper: ADMM-based group sparse solver
 solve_rrr_admm <- function(X, tilde_Y, Sx = NULL, lambda, rho=1, niter=10, thresh, verbose = FALSE, thresh_0 = 0,
-                           invSx_apply = NULL) {
+                           invSx_apply = NULL,
+                           matrix_free_threshold = 4000L,
+                           cg_tol = 1e-6,
+                           cg_maxiter = NULL) {
   p <- ncol(X); 
   q <- ncol(tilde_Y)
   n <- nrow(X)
 
   if (is.null(invSx_apply)) {
-    invSx_info <- make_invSx_apply(X, Sx, rho, verbose = verbose)
+    invSx_info <- make_invSx_apply(
+      X, Sx, rho, verbose = verbose,
+      matrix_free_threshold = matrix_free_threshold,
+      cg_tol = cg_tol,
+      cg_maxiter = cg_maxiter
+    )
     invSx_apply <- invSx_info$apply
     if (verbose) message("ADMM linear solver strategy: ", invSx_info$strategy)
   }
@@ -332,7 +340,10 @@ solve_rrr_admm <- function(X, tilde_Y, Sx = NULL, lambda, rho=1, niter=10, thres
 # Helper: CVXR-based group sparse solver
 solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
                            rho = 1, niter = 1e4, thresh = 1e-4,
-                           verbose = FALSE) {
+                           verbose = FALSE,
+                           matrix_free_threshold = 4000L,
+                           cg_tol = 1e-6,
+                           cg_maxiter = NULL) {
   if (!requireNamespace("CVXR", quietly = TRUE)) {
     stop("Package 'CVXR' must be installed to use the CVX solver.",
          call. = FALSE)
@@ -348,7 +359,10 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
     solve_rrr_admm(
       X, tilde_Y, Sx = NULL, lambda = lambda, rho = rho,
       niter = niter, thresh = thresh, thresh_0 = thresh_0,
-      verbose = verbose
+      verbose = verbose,
+      matrix_free_threshold = matrix_free_threshold,
+      cg_tol = cg_tol,
+      cg_maxiter = cg_maxiter
     )
   }
 
@@ -403,6 +417,9 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
 #' @param thresh_0 For the ADMM solver: Set entries whose absolute value is below this to 0 (default 1e-6).
+#' @param matrix_free_threshold For ADMM: when both `n` and `p` are at least this value, use a matrix-free conjugate-gradient solve instead of forming a dense linear system.
+#' @param cg_tol Relative tolerance for the matrix-free conjugate-gradient solve used in ADMM.
+#' @param cg_maxiter Maximum iterations for the matrix-free conjugate-gradient solve. Defaults to `min(p, 1000)`.
 #' @param verbose Logical for verbose output.
 #'
 #' @return A list with elements:
@@ -423,6 +440,9 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                     rho=1,
                     niter=1e4,
                     thresh = 1e-4, thresh_0 = 0,
+                    matrix_free_threshold = 4000L,
+                    cg_tol = 1e-6,
+                    cg_maxiter = NULL,
                     verbose=FALSE) {
   
   n <- nrow(X)
@@ -448,14 +468,20 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
       if(verbose){ print("Using CVX solver")}
       B_fit <- solve_rrr_cvxr(
         X, tilde_Y, lambda, thresh_0 = thresh_0,
-        rho = rho, niter = niter, thresh = thresh, verbose = verbose
+        rho = rho, niter = niter, thresh = thresh, verbose = verbose,
+        matrix_free_threshold = matrix_free_threshold,
+        cg_tol = cg_tol,
+        cg_maxiter = cg_maxiter
       )
     } else if (solver == "ADMM") {
       if(verbose){print("Using ADMM solver")}
       B_fit <- solve_rrr_admm(X, tilde_Y, Sx = Sx,
                               lambda=lambda, rho=rho, niter=niter, 
                               thresh=thresh, thresh_0=thresh_0,
-                              verbose = verbose)
+                              verbose = verbose,
+                              matrix_free_threshold = matrix_free_threshold,
+                              cg_tol = cg_tol,
+                              cg_maxiter = cg_maxiter)
     } else {
       if(verbose){print("Using gglasso solver")}
         if (!requireNamespace("rrpack", quietly = TRUE)) {
@@ -500,6 +526,9 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param thresh Convergence threshold.
 #' @param verbose Logical for verbose output.
 #' @param thresh_0 tolerance for declaring entries non-zero
+#' @param matrix_free_threshold For ADMM: when both `n` and `p` are at least this value, use a matrix-free conjugate-gradient solve instead of forming a dense linear system.
+#' @param cg_tol Relative tolerance for the matrix-free conjugate-gradient solve used in ADMM.
+#' @param cg_maxiter Maximum iterations for the matrix-free conjugate-gradient solve. Defaults to `min(p, 1000)`.
 #' @param nb_cores Number of cores to use for parallelization. Defaults to min(kfolds, available cores minus 1).
 #'
 #' @return A list with elements:
@@ -524,6 +553,9 @@ cca_rrr_cv <- function(X, Y,
                        rho=1,
                        thresh_0=0,
                        niter=1e4,
+                       matrix_free_threshold = 4000L,
+                       cg_tol = 1e-6,
+                       cg_maxiter = NULL,
                        thresh = 1e-4, verbose=FALSE,
                        nb_cores = NULL) {
   
@@ -539,6 +571,9 @@ cca_rrr_cv <- function(X, Y,
                      LW_Sy = LW_Sy,
                      lambda=lambda, r=r, solver=solver, 
                      rho=rho, niter=niter, thresh=thresh,
+                     matrix_free_threshold = matrix_free_threshold,
+                     cg_tol = cg_tol,
+                     cg_maxiter = cg_maxiter,
                      thresh_0=thresh_0, folds = folds)
   }
   
@@ -575,8 +610,9 @@ cca_rrr_cv <- function(X, Y,
         if (verbose){
           cat(crayon::green("Parallel backend successfully registered.\n"))
         }
+        initialize_parallel_workers(cl, verbose = verbose)
         doParallel::registerDoParallel(cl)
-        on.exit(parallel::stopCluster(cl), add = TRUE)
+        on.exit(cleanup_parallel_backend(cl), add = TRUE)
       } else {
         # If setup_parallel_backend returned NULL, print a warning and proceed serially
         warning("All parallel setup attempts failed. Proceeding in serial mode.", immediate. = TRUE)
@@ -585,18 +621,33 @@ cca_rrr_cv <- function(X, Y,
    }
 
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
+    rrr_parallel_exports <- c(
+      "cca_rrr_cv_folds", "cca_rrr", "solve_rrr_admm", "solve_rrr_cvxr",
+      "make_invSx_apply", ".rrr_cg_solve", ".rrr_chol_jitter",
+      ".rrr_invsqrt_psd", ".rrr_whiten_factor", ".rrr_safe_rank_svd",
+      ".postprocess_rrr_fit", "compute_sqrt_inv"
+    )
     if (solver  %in% c("CVX", "CVXR" )){
         if (!requireNamespace("CVXR", quietly = TRUE)) {
          stop("Package 'CVXR' must be installed to use the CVXR/CVX solver.",
          call. = FALSE)
           }
 
-      resultsx <- foreach(lambda=lambdas, .combine=rbind, .packages=c('CVXR','Matrix')) %dopar% {
+      resultsx <- foreach(
+        lambda = lambdas,
+        .combine = rbind,
+        .packages = c("CVXR", "Matrix"),
+        .export = rrr_parallel_exports
+      ) %dopar% {
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
 
     }else{
-      resultsx <- foreach(lambda=lambdas, .combine=rbind) %dopar% {
+      resultsx <- foreach(
+        lambda = lambdas,
+        .combine = rbind,
+        .export = rrr_parallel_exports
+      ) %dopar% {
       data.frame(lambda=lambda, rmse=cv_function(lambda))
     }
     }
@@ -618,6 +669,9 @@ cca_rrr_cv <- function(X, Y,
                    lambda=opt_lambda, r=r,
                    highdim=TRUE, solver=solver,
                    standardize=FALSE, LW_Sy=LW_Sy, rho=rho, niter=niter, 
+                   matrix_free_threshold = matrix_free_threshold,
+                   cg_tol = cg_tol,
+                   cg_maxiter = cg_maxiter,
                    thresh=thresh, thresh_0=thresh_0,verbose=verbose)
 
 
@@ -643,6 +697,9 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                              LW_Sy = TRUE,
                              niter=1e4,
                              thresh_0=0,
+                             matrix_free_threshold = 4000L,
+                             cg_tol = 1e-6,
+                             cg_maxiter = NULL,
                              thresh = 1e-4,
                              folds = NULL) {
   if (is.null(folds)) {
@@ -674,6 +731,9 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                        Sx=Sx_train, Sy=Sy_train, highdim=TRUE,
                        lambda=lambda, r=r, solver=solver,
                        LW_Sy=LW_Sy, standardize=FALSE, rho=rho, niter=niter, 
+                       matrix_free_threshold = matrix_free_threshold,
+                       cg_tol = cg_tol,
+                       cg_maxiter = cg_maxiter,
                        thresh=thresh, thresh_0=thresh_0,
                        verbose=FALSE)
       mean((X_val %*% final$U - Y_val %*% final$V)^2)

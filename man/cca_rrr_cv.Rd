@@ -13,10 +13,13 @@ cca_rrr_cv(
   solver = "ADMM",
   parallelize = FALSE,
   LW_Sy = TRUE,
-  standardize = TRUE,
+  standardize = FALSE,
   rho = 1,
-  thresh_0 = 1e-06,
+  thresh_0 = 0,
   niter = 10000,
+  matrix_free_threshold = 4000L,
+  cg_tol = 1e-06,
+  cg_maxiter = NULL,
   thresh = 1e-04,
   verbose = FALSE,
   nb_cores = NULL
@@ -46,6 +49,12 @@ cca_rrr_cv(
 \item{thresh_0}{tolerance for declaring entries non-zero}
 
 \item{niter}{Maximum number of iterations for ADMM.}
+
+\item{matrix_free_threshold}{For ADMM: when both \code{n} and \code{p} are at least this value, use a matrix-free conjugate-gradient solve instead of forming a dense linear system.}
+
+\item{cg_tol}{Relative tolerance for the matrix-free conjugate-gradient solve used in ADMM.}
+
+\item{cg_maxiter}{Maximum iterations for the matrix-free conjugate-gradient solve. Defaults to \code{min(p, 1000)}.}
 
 \item{thresh}{Convergence threshold.}
 

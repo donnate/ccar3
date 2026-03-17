@@ -354,8 +354,9 @@ cca_group_rrr_cv <- function(X, Y, groups, r = 2,
           cat(crayon::green("Parallel backend successfully registered.\n"))
         }
 
+        initialize_parallel_workers(cl, verbose = verbose)
         doParallel::registerDoParallel(cl)
-        on.exit(parallel::stopCluster(cl), add = TRUE)
+        on.exit(cleanup_parallel_backend(cl), add = TRUE)
       } else {
         # If setup_parallel_backend returned NULL, print a warning and proceed serially
         warning("All parallel setup attempts failed. Proceeding in serial mode.", immediate. = TRUE)

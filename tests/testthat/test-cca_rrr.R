@@ -73,3 +73,23 @@ test_that("cca_rrr computes the same solutions across solvers", {
   expect_true(subdistance(result2$U, gen$u) <0.2 )
   expect_true(subdistance(result3$U, gen$u) <0.2 )
 })
+
+
+test_that("cca_rrr exposes matrix-free ADMM tuning arguments", {
+  set.seed(42)
+  X <- matrix(rnorm(80 * 12), 80, 12)
+  Y <- matrix(rnorm(80 * 4), 80, 4)
+
+  result <- cca_rrr(
+    X, Y, r = 2,
+    highdim = TRUE,
+    solver = "ADMM",
+    matrix_free_threshold = 1L,
+    cg_tol = 1e-5,
+    cg_maxiter = 50
+  )
+
+  expect_type(result, "list")
+  expect_equal(dim(result$U), c(12, 2))
+  expect_equal(dim(result$V), c(4, 2))
+})

@@ -34,6 +34,79 @@ gca_to_cca <-
 #' @param verbose If TRUE, prints messages about the setup process.
 #' @return A cluster object `cl` on success, or `NULL` on failure.
 
+cleanup_parallel_backend <- function(cl = NULL, verbose = FALSE) {
+  if (!is.null(cl)) {
+    try(parallel::stopCluster(cl), silent = !verbose)
+  }
+
+  if (requireNamespace("foreach", quietly = TRUE)) {
+    foreach::registerDoSEQ()
+  }
+
+  if (requireNamespace("doParallel", quietly = TRUE) &&
+      exists("stopImplicitCluster", envir = asNamespace("doParallel"), inherits = FALSE)) {
+    try(doParallel::stopImplicitCluster(), silent = !verbose)
+  }
+
+  invisible(NULL)
+}
+
+initialize_parallel_workers <- function(cl,
+                                        pkg = "ccar3",
+                                        pkg_path = NULL,
+                                        verbose = FALSE) {
+  if (is.null(cl)) {
+    return(invisible(NULL))
+  }
+
+  parallel::clusterEvalQ(cl, {
+    Sys.setenv(
+      OMP_NUM_THREADS = 1,
+      OPENBLAS_NUM_THREADS = 1,
+      MKL_NUM_THREADS = 1,
+      VECLIB_MAXIMUM_THREADS = 1
+    )
+    NULL
+  })
+
+  if (is.null(pkg_path)) {
+    wd <- tryCatch(normalizePath(getwd(), mustWork = FALSE), error = function(e) "")
+    if (nzchar(wd) &&
+        file.exists(file.path(wd, "DESCRIPTION")) &&
+        file.exists(file.path(wd, "NAMESPACE"))) {
+      pkg_path <- wd
+    }
+  }
+
+  if (!is.null(pkg_path) &&
+      nzchar(pkg_path) &&
+      requireNamespace("pkgload", quietly = TRUE)) {
+    if (verbose) {
+      cat("Initializing workers from source package at", pkg_path, "\n")
+    }
+    parallel::clusterCall(cl, function(path) {
+      pkgload::load_all(
+        path,
+        quiet = TRUE,
+        export_all = FALSE,
+        helpers = FALSE,
+        attach_testthat = FALSE
+      )
+      NULL
+    }, pkg_path)
+  } else {
+    if (verbose) {
+      cat("Initializing workers with installed package", pkg, "\n")
+    }
+    parallel::clusterCall(cl, function(pkg_name) {
+      suppressPackageStartupMessages(library(pkg_name, character.only = TRUE))
+      NULL
+    }, pkg)
+  }
+
+  invisible(NULL)
+}
+
 setup_parallel_backend <- function(num_cores = NULL, verbose = FALSE) {
 
   # 1. Determine the number of cores to use
@@ -47,42 +120,49 @@ setup_parallel_backend <- function(num_cores = NULL, verbose = FALSE) {
   if (verbose){
      cat(paste("\nAttempting to set up parallel backend with", num_cores, "cores.\n"))
   }
-  
-  
   cl <- NULL
-  
-  # Use a nested tryCatch to attempt different cluster types
-  tryCatch({
-    # The preferred method for Unix/macOS/Linux is FORK
-    if (.Platform$OS.type == "unix") {
-      if (verbose){
-        cat("Unix-like system detected. Trying FORK backend (most efficient)...\n")
-      }
-      cl <- parallel::makeCluster(num_cores, type = "FORK")
-    } else {
-      # The only method for Windows is PSOCK
-      if (verbose){
-          cat("Windows system detected. Trying PSOCK backend...\n")
-      }
-      cl <- parallel::makeCluster(num_cores, type = "PSOCK")
+  sysname <- Sys.info()[["sysname"]]
+  prefer_fork <- .Platform$OS.type == "unix" && !identical(sysname, "Darwin")
+
+  if (prefer_fork) {
+    if (verbose) {
+      cat("Unix-like system detected. Trying FORK backend first...\n")
     }
-  }, error = function(e_fork) {
-    # This block runs if the first attempt (e.g., FORK) failed
- 
-      cat(crayon::yellow("Initial backend setup failed with error: ", e_fork$message, "\n"))
+    cl <- tryCatch(
+      parallel::makeCluster(num_cores, type = "FORK"),
+      error = function(e_fork) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+          cat(crayon::yellow("Initial FORK backend setup failed: ", e_fork$message, "\n"))
+        } else {
+          cat("Initial FORK backend setup failed:", e_fork$message, "\n")
+        }
+        NULL
+      }
+    )
+  } else if (verbose) {
+    if (identical(sysname, "Darwin")) {
+      cat("macOS detected. Using PSOCK backend to avoid orphaned FORK workers on interrupts...\n")
+    } else {
+      cat("Using PSOCK backend...\n")
+    }
+  }
+
+  if (is.null(cl)) {
+    if (verbose && prefer_fork) {
       cat("Attempting fallback PSOCK backend...\n")
-    
-    
-    # Second attempt: Try PSOCK, which works everywhere but may be blocked
-    tryCatch({
-      cl <<- parallel::makeCluster(num_cores, type = "PSOCK")
-    }, error = function(e_psock) {
-      # This block runs if PSOCK also fails
-      cat(crayon::red("PSOCK setup also failed: ", e_psock$message, "\n"))
-      # cl remains NULL
-    })
-  })
-  
+    }
+    cl <- tryCatch(
+      parallel::makeCluster(num_cores, type = "PSOCK"),
+      error = function(e_psock) {
+        if (requireNamespace("crayon", quietly = TRUE)) {
+          cat(crayon::red("PSOCK setup also failed: ", e_psock$message, "\n"))
+        } else {
+          cat("PSOCK setup also failed:", e_psock$message, "\n")
+        }
+        NULL
+      }
+    )
+  }
+
   return(cl)
 }
-

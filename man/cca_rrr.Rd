@@ -18,7 +18,10 @@ cca_rrr(
   rho = 1,
   niter = 10000,
   thresh = 1e-04,
-  thresh_0 = 1e-06,
+  thresh_0 = 0,
+  matrix_free_threshold = 4000L,
+  cg_tol = 1e-06,
+  cg_maxiter = NULL,
   verbose = FALSE
 )
 }
@@ -50,6 +53,12 @@ cca_rrr(
 \item{thresh}{Convergence threshold.}
 
 \item{thresh_0}{For the ADMM solver: Set entries whose absolute value is below this to 0 (default 1e-6).}
+
+\item{matrix_free_threshold}{For ADMM: when both \code{n} and \code{p} are at least this value, use a matrix-free conjugate-gradient solve instead of forming a dense linear system.}
+
+\item{cg_tol}{Relative tolerance for the matrix-free conjugate-gradient solve used in ADMM.}
+
+\item{cg_maxiter}{Maximum iterations for the matrix-free conjugate-gradient solve. Defaults to \code{min(p, 1000)}.}
 
 \item{verbose}{Logical for verbose output.}
 }
