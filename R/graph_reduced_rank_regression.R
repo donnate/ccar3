@@ -42,6 +42,79 @@ library(foreach)
   M
 }
 
+.graph_null_basis <- function(Gamma, tol = 1e-10) {
+  p <- ncol(Gamma)
+  if (p < 1) {
+    return(matrix(0, 0, 0))
+  }
+
+  parent <- seq_len(p)
+  rank <- integer(p)
+
+  find_root <- function(x) {
+    root <- x
+    while (parent[root] != root) {
+      root <- parent[root]
+    }
+    while (parent[x] != x) {
+      next_x <- parent[x]
+      parent[x] <<- root
+      x <- next_x
+    }
+    root
+  }
+
+  union_nodes <- function(a, b) {
+    ra <- find_root(a)
+    rb <- find_root(b)
+    if (ra == rb) {
+      return(invisible(NULL))
+    }
+
+    if (rank[ra] < rank[rb]) {
+      parent[ra] <<- rb
+    } else if (rank[ra] > rank[rb]) {
+      parent[rb] <<- ra
+    } else {
+      parent[rb] <<- ra
+      rank[ra] <<- rank[ra] + 1L
+    }
+
+    invisible(NULL)
+  }
+
+  nz_by_row <- if (inherits(Gamma, "sparseMatrix")) {
+    gamma_summary <- Matrix::summary(Gamma)
+    gamma_summary <- gamma_summary[abs(gamma_summary$x) > tol, c("i", "j"), drop = FALSE]
+    split(gamma_summary$j, gamma_summary$i)
+  } else {
+    nz_idx <- which(abs(Gamma) > tol, arr.ind = TRUE)
+    split(nz_idx[, "col"], nz_idx[, "row"])
+  }
+
+  for (cols in nz_by_row) {
+    cols <- unique(as.integer(cols))
+    if (length(cols) < 2L) {
+      next
+    }
+    anchor <- cols[1]
+    for (col_idx in cols[-1]) {
+      union_nodes(anchor, col_idx)
+    }
+  }
+
+  roots <- vapply(seq_len(p), find_root, integer(1))
+  components <- split(seq_len(p), roots)
+  basis <- matrix(0, p, length(components))
+
+  for (k in seq_along(components)) {
+    idx <- components[[k]]
+    basis[idx, k] <- 1 / sqrt(length(idx))
+  }
+
+  basis
+}
+
 .make_graph_invSx_apply <- function(A, rho, ridge = 1e-8, verbose = FALSE) {
   A <- .as_double_matrix(A)
   n <- nrow(A)
@@ -103,7 +176,8 @@ library(foreach)
       mode = "regularized",
       Gamma = Gamma,
       gamma_ridge = gamma_ridge,
-      solve_L = solve_L
+      solve_L = solve_L,
+      null_basis = .graph_null_basis(Gamma)
     ))
   }
 
@@ -124,7 +198,7 @@ library(foreach)
 
     return(list(
       XGamma_dagger = as.matrix(Matrix::t(graph_cache$Gamma %*% solved_tX)),
-      XPi = graph_cache$gamma_ridge * t(solved_tX),
+      XPi = if (is.null(X)) NULL else .as_double_matrix(X %*% graph_cache$null_basis),
       solved_tX = solved_tX
     ))
   }
@@ -144,7 +218,7 @@ library(foreach)
   if (graph_cache$mode == "regularized") {
     return(list(
       gamma_dagger_B = graph_cache$solve_L(Matrix::crossprod(graph_cache$Gamma, .as_double_matrix(B))),
-      Pi_projection = graph_cache$gamma_ridge * graph_cache$solve_L(Projection)
+      Pi_projection = .as_double_matrix(graph_cache$null_basis %*% Projection)
     ))
   }
 
@@ -214,7 +288,11 @@ library(foreach)
   }
 
   XGamma_dagger <- graph_design$XGamma_dagger
-  XPi <- graph_design$XPi
+  XPi <- if (is.null(graph_design$XPi) && graph_cache$mode == "regularized") {
+    .as_double_matrix(X %*% graph_cache$null_basis)
+  } else {
+    graph_design$XPi
+  }
 
   Projection <- tryCatch(
     qr.solve(XPi, tilde_Y),
@@ -281,14 +359,17 @@ library(foreach)
     thresh_0 = thresh_0,
     verbose = verbose
   )
+  regression_loss <- mean((X %*% B_post - tilde_Y)^2)
 
   list(
     U = post$U,
     V = post$V,
     loss = post$loss,
+    regression_loss = regression_loss,
     cor = post$cor,
     Lambda = post$Lambda,
-    B_opt = B_post
+    B_opt = B_post,
+    sqrt_inv_Sy = sqrt_inv_Sy
   )
 }
 
@@ -333,6 +414,7 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
         graph_design <- if (!is.null(solved_tX) && graph_cache$mode == "regularized") {
           .transform_graph_design(
             graph_cache,
+            X = X_train,
             solved_tX = solved_tX[, -folds[[i]], drop = FALSE]
           )
         } else {
@@ -360,7 +442,10 @@ cca_graph_rrr_cv_folds <- function(X, Y, Gamma,
                              Gamma_dagger = Gamma_dagger)
       }
 
-      sqrt(mean((X_val %*% fit$U - Y_val %*% fit$V)^2))
+      # Score the same regression target optimized during training:
+      # X B approximates Y whitened by the training-fold Sy estimate.
+      tilde_Y_val <- Y_val %*% fit$sqrt_inv_Sy
+      mean((X_val %*% fit$B_opt - tilde_Y_val)^2)
     }, error = function(e) {
       message("Error in fold ", i, ": ", conditionMessage(e))
       NA_real_
@@ -443,7 +528,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
   Sy <- if (LW_Sy) NULL else crossprod(Y) / n
   graph_cache <- .prepare_graph_cache(Gamma, max(thresh_0, 1e-6), Gamma_dagger = Gamma_dagger)
   solved_tX <- if (graph_cache$mode == "regularized") graph_cache$solve_L(t(X)) else NULL
-  full_graph_design <- if (!is.null(solved_tX)) .transform_graph_design(graph_cache, solved_tX = solved_tX) else NULL
+  full_graph_design <- if (!is.null(solved_tX)) .transform_graph_design(graph_cache, X = X, solved_tX = solved_tX) else NULL
 
   folds <- caret::createFolds(1:nrow(Y), k = kfolds, list = TRUE)
   .rrr_chol_jitter <- .rrr_chol_jitter
