@@ -1,0 +1,40 @@
+cca_graph_rrr           Graph-regularized Reduced-Rank Regression for
+                        Canonical Correlation Analysis
+cca_graph_rrr_cv        Graph-regularized Reduced-Rank Regression for
+                        Canonical Correlation Analysis with cross
+                        validation
+cca_group_rrr           Group-Sparse Canonical Correlation via
+                        Reduced-Rank Regression
+cca_group_rrr_cv        Group-Sparse Canonical Correlation via
+                        Reduced-Rank Regression with CV
+cca_rrr                 Canonical Correlation Analysis via Reduced Rank
+                        Regression (RRR)
+cca_rrr_cv              Cross-validated Canonical Correlation Analysis
+                        via RRR
+ecca                    Efficient CCA for Two High-Dimensional Views
+ecca.cv                 Cross-Validated Efficient CCA
+FPR                     False Positive Rate (TPR)
+get_edge_incidence      Return the edge incidence matrix of an igraph
+                        graph
+principal_angles        Metrics for subspaces
+regular_cca             Function to perform regular (low dimensional)
+                        canonical correlation analysis (CCA
+SCCA_Parkhomenko        Function to perform Sparse CCA based on
+                        Waaijenborg et al. (2008) REFERENCE Parkhomenko
+                        et al. (2009), "Sparse Canonical Correlation
+                        Anlaysis with Application to Genomic Data
+                        Integration" in Statistical Applications in
+                        Genetics and Molecular Biology, Volume 8, Issue
+                        1, Article 1
+sinTheta                SinTheta distance between subspaces
+sparse_CCA_benchmarks   Additional Benchmarks for Sparse CCA Methods
+SparseCCA               Function to perform Sparse CCA based on Wilms
+                        and Croux (2018) REFERENCE Wilms, I., & Croux,
+                        C. (2018). Sparse canonical correlation
+                        analysis using alternating regressions. Journal
+                        of Computational and Graphical Statistics,
+                        27(1), 1-10.
+subdistance             Subdistance between subspaces
+TNR                     True Negative Rate (TNR)
+TPR                     True Positive Rate (TPR)
+Witten.CV               Sparse CCA by Witten and Tibshirani (2009)

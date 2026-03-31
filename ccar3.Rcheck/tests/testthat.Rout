@@ -1,0 +1,905 @@
+
+R version 4.4.3 (2025-02-28) -- "Trophy Case"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> # This file is part of the standard setup for testthat.
+> # It is recommended that you do not modify it.
+> #
+> # Where should you do additional test configuration?
+> # Learn more about the roles of various files in:
+> # * https://r-pkgs.org/testing-design.html#sec-tests-files-overview
+> # * https://testthat.r-lib.org/articles/special-files.html
+> 
+> library(testthat)
+> library(ccar3)
+> 
+> test_check("ccar3")
+
+ Permutation  1  out of  50  123456789
+ Permutation  2  out of  50  123456789
+ Permutation  3  out of  50  123456789
+ Permutation  4  out of  50  123456789
+ Permutation  5  out of  50  123456789
+ Permutation  6  out of  50  123456789
+ Permutation  7  out of  50  123456789
+ Permutation  8  out of  50  123456789
+ Permutation  9  out of  50  123456789
+ Permutation  10  out of  50  123456789
+ Permutation  11  out of  50  123456789
+ Permutation  12  out of  50  123456789
+ Permutation  13  out of  50  123456789
+ Permutation  14  out of  50  123456789
+ Permutation  15  out of  50  123456789
+ Permutation  16  out of  50  123456789
+ Permutation  17  out of  50  123456789
+ Permutation  18  out of  50  123456789
+ Permutation  19  out of  50  123456789
+ Permutation  20  out of  50  123456789
+ Permutation  21  out of  50  123456789
+ Permutation  22  out of  50  123456789
+ Permutation  23  out of  50  123456789
+ Permutation  24  out of  50  123456789
+ Permutation  25  out of  50  123456789
+ Permutation  26  out of  50  123456789
+ Permutation  27  out of  50  123456789
+ Permutation  28  out of  50  123456789
+ Permutation  29  out of  50  123456789
+ Permutation  30  out of  50  123456789
+ Permutation  31  out of  50  123456789
+ Permutation  32  out of  50  123456789
+ Permutation  33  out of  50  123456789
+ Permutation  34  out of  50  123456789
+ Permutation  35  out of  50  123456789
+ Permutation  36  out of  50  123456789
+ Permutation  37  out of  50  123456789
+ Permutation  38  out of  50  123456789
+ Permutation  39  out of  50  123456789
+ Permutation  40  out of  50  123456789
+ Permutation  41  out of  50  123456789
+ Permutation  42  out of  50  123456789
+ Permutation  43  out of  50  123456789
+ Permutation  44  out of  50  123456789
+ Permutation  45  out of  50  123456789
+ Permutation  46  out of  50  123456789
+ Permutation  47  out of  50  123456789
+ Permutation  48  out of  50  123456789
+ Permutation  49  out of  50  123456789
+ Permutation  50  out of  50  123456789
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0479 
+
+PSOCK setup also failed:  numeric 'names' must be >= 1 
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0492 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0477 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0745 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0374 
+
+PSOCK setup also failed:  numeric 'names' must be >= 1 
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0711 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0802 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0613 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0479 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2331 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1635 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.3507 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.2029 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 0.8132 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.1408 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0479 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0479 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0714 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0714 
+
+Estimating optimal shrinkage intensity lambda.var (variance vector): 1 
+
+Estimating optimal shrinkage intensity lambda (correlation matrix): 0.0714 
+
+PSOCK setup also failed:  numeric 'names' must be >= 1 
+PSOCK setup also failed:  numeric 'names' must be >= 1 
+PSOCK setup also failed:  numeric 'names' must be >= 1 
+[1] "Done ADMM"
+[1] "Done CVXR"
+[1] "We have:"
+[1] 100   1   5
+[1] "--------------------------------------"
+[1] "Generating data ..."
+[1] "Number of non zeros is: 5"
+[1] "Data generated."
+[1] "--------------------------------------"
+eps = 1e-04  maxiter = 500 
+
+iter: 50  r: 7.88e-15  s: 0.0386
+iter: 100  r: 8.33e-15  s: 0.0131
+iter: 150  r: 8.49e-15  s: 0.00634
+iter: 200  r: 8.64e-15  s: 0.00357
+iter: 250  r: 8.73e-15  s: 0.00221
+iter: 300  r: 8.5e-15  s: 0.00145
+iter: 350  r: 8.55e-15  s: 0.000977
+iter: 400  r: 8.82e-15  s: 0.000672
+iter: 450  r: 9.02e-15  s: 0.000466
+iter: 500  r: 8.78e-15  s: 0.000324
+ADMM did not converge (hit maxiter).
+[1] "We have:"
+[1] 100   1   5
+[1] "--------------------------------------"
+[1] "Generating data ..."
+[1] "Number of non zeros is: 5"
+[1] "Data generated."
+[1] "--------------------------------------"
+eps = 1e-04  maxiter = 500 
+
+ADMM converged.
+[1] "We have:"
+[1] 100   1   5
+[1] "--------------------------------------"
+[1] "Generating data ..."
+[1] "Number of non zeros is: 5"
+[1] "Data generated."
+[1] "--------------------------------------"
+
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Refitting at selected lambda with ADMM logs...
+
+Starting lambda 1/1: 0.05
+ lambda 1/1 = 0.05
+   iter 1  r=0.938376  s=0.402581
+   iter 2  r=0.386388  s=0.351783
+   iter 3  r=0.174349  s=0.213626
+   iter 4  r=0.0894817  s=0.118771
+   iter 5  r=0.0499279  s=0.0651281
+   iter 6  r=0.0292555  s=0.0362484
+   iter 7  r=0.017375  s=0.0211264
+   iter 8  r=0.0105751  s=0.0128797
+   iter 9  r=0.00652473  s=0.0081953
+   iter 10  r=0.00407171  s=0.00544353
+   iter 11  r=0.00257974  s=0.00371766
+   iter 12  r=0.00165766  s=0.0025963
+   iter 13  r=0.00107901  s=0.00184187
+Finished lambda 1/1 in 0.0s
+Final ADMM refit completed.
+[1] "We have:"
+[1] 100   1   5
+[1] "--------------------------------------"
+[1] "Generating data ..."
+[1] "Number of non zeros is: 5"
+[1] "Data generated."
+[1] "--------------------------------------"
+PSOCK setup also failed:  numeric 'names' must be >= 1 
+
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Starting lambda 1/7: 0.5
+ lambda 1/7 = 0.5
+Finished lambda 1/7 in 0.0s
+Starting lambda 2/7: 0.1
+ lambda 2/7 = 0.1
+Finished lambda 2/7 in 0.0s
+Starting lambda 3/7: 0.075
+ lambda 3/7 = 0.075
+Finished lambda 3/7 in 0.0s
+Starting lambda 4/7: 0.05
+ lambda 4/7 = 0.05
+Finished lambda 4/7 in 0.0s
+Starting lambda 5/7: 0.01
+ lambda 5/7 = 0.01
+Finished lambda 5/7 in 0.0s
+Starting lambda 6/7: 0.001
+ lambda 6/7 = 0.001
+Finished lambda 6/7 in 0.0s
+Starting lambda 7/7: 0.0001
+ lambda 7/7 = 0.0001
+Finished lambda 7/7 in 0.0s
+Refitting at selected lambda with ADMM logs...
+
+Starting lambda 1/1: 0.05
+ lambda 1/1 = 0.05
+   iter 1  r=0.938376  s=0.402581
+   iter 2  r=0.386388  s=0.351783
+   iter 3  r=0.174349  s=0.213626
+   iter 4  r=0.0894817  s=0.118771
+   iter 5  r=0.0499279  s=0.0651281
+   iter 6  r=0.0292555  s=0.0362484
+   iter 7  r=0.017375  s=0.0211264
+   iter 8  r=0.0105751  s=0.0128797
+   iter 9  r=0.00652473  s=0.0081953
+   iter 10  r=0.00407171  s=0.00544353
+   iter 11  r=0.00257974  s=0.00371766
+   iter 12  r=0.00165766  s=0.0025963
+   iter 13  r=0.00107901  s=0.00184187
+Finished lambda 1/1 in 0.0s
+Final ADMM refit completed.
+[ FAIL 0 | WARN 6 | SKIP 0 | PASS 158 ]
+
+[ FAIL 0 | WARN 6 | SKIP 0 | PASS 158 ]
+> 
+> proc.time()
+   user  system elapsed 
+ 23.032   1.638  25.050 
