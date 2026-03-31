@@ -1,7 +1,11 @@
-^\.DS_Store$
-^\.git$
-^\.Rhistory$
-^\.RData$
 ^\.git$
 ^\.github$
+^\.Rhistory$
+^\.RData$
 ^LICENSE\.md$
+^ccar3\.Rcheck$
+^ccar3_[0-9.-]+\.tar\.gz$
+^\.DS_Store$
+^R/\.DS_Store$
+^R/ecca 2\.r$
+^man/ecca 2\.Rd$

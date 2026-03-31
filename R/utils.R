@@ -24,15 +24,11 @@ gca_to_cca <-
   }
 
 
-#' Set up a parallel backend with graceful fallbacks.
-#'
-#' Attempts to create a parallel cluster, first trying the efficient FORK
-#' method (on Unix-like systems), then falling back to PSOCK, and finally
-#' returning NULL if all attempts fail.
-#'
-#' @param num_cores The number of cores to use. If NULL, it's determined automatically.
-#' @param verbose If TRUE, prints messages about the setup process.
-#' @return A cluster object `cl` on success, or `NULL` on failure.
+# Set up a parallel backend with graceful fallbacks.
+#
+# Attempts to create a parallel cluster, first trying the efficient FORK
+# method (on Unix-like systems), then falling back to PSOCK, and finally
+# returning NULL if all attempts fail.
 
 cleanup_parallel_backend <- function(cl = NULL, verbose = FALSE) {
   if (!is.null(cl)) {
@@ -59,6 +55,22 @@ cleanup_parallel_backend <- function(cl = NULL, verbose = FALSE) {
 .safe_sd_na <- function(x) {
   out <- stats::sd(x, na.rm = TRUE)
   if (is.nan(out)) NA_real_ else out
+}
+
+.create_cv_folds <- function(n, k) {
+  n <- as.integer(n)
+  k <- as.integer(k)
+
+  if (length(n) != 1L || is.na(n) || n < 2L) {
+    stop("`n` must be a single integer >= 2.", call. = FALSE)
+  }
+  if (length(k) != 1L || is.na(k) || k < 2L) {
+    stop("`k` must be a single integer >= 2.", call. = FALSE)
+  }
+
+  k <- min(k, n)
+  fold_ids <- sample(rep(seq_len(k), length.out = n))
+  unname(split(seq_len(n), fold_ids))
 }
 
 .find_local_global_names <- function(fun) {
