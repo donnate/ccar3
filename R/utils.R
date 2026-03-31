@@ -132,6 +132,25 @@ initialize_parallel_workers <- function(cl,
   })
 
   if (is.null(pkg_path)) {
+    option_path <- getOption("ccar3_pkg_path", default = NULL)
+    if (!is.null(option_path) &&
+        nzchar(option_path) &&
+        file.exists(file.path(option_path, "DESCRIPTION")) &&
+        file.exists(file.path(option_path, "NAMESPACE"))) {
+      pkg_path <- option_path
+    }
+  }
+
+  if (is.null(pkg_path)) {
+    env_path <- Sys.getenv("CCAR3_PKG_PATH", unset = "")
+    if (nzchar(env_path) &&
+        file.exists(file.path(env_path, "DESCRIPTION")) &&
+        file.exists(file.path(env_path, "NAMESPACE"))) {
+      pkg_path <- env_path
+    }
+  }
+
+  if (is.null(pkg_path)) {
     ns_path <- tryCatch({
       if (requireNamespace("pkgload", quietly = TRUE) &&
           pkg %in% loadedNamespaces() &&
@@ -158,22 +177,39 @@ initialize_parallel_workers <- function(cl,
     }
   }
 
-  if (!is.null(pkg_path) &&
-      nzchar(pkg_path) &&
-      requireNamespace("pkgload", quietly = TRUE)) {
-    if (verbose) {
-      cat("Initializing workers from source package at", pkg_path, "\n")
+  if (!is.null(pkg_path) && nzchar(pkg_path)) {
+    if (requireNamespace("pkgload", quietly = TRUE)) {
+      if (verbose) {
+        cat("Initializing workers from source package at", pkg_path, "\n")
+      }
+      parallel::clusterCall(cl, function(path) {
+        pkgload::load_all(
+          path,
+          quiet = TRUE,
+          export_all = FALSE,
+          helpers = FALSE,
+          attach_testthat = FALSE
+        )
+        NULL
+      }, pkg_path)
+    } else {
+      if (verbose) {
+        cat("Initializing workers by sourcing R files from", pkg_path, "\n")
+      }
+      parallel::clusterCall(cl, function(path) {
+        r_dir <- file.path(path, "R")
+        r_files <- c(
+          file.path(r_dir, "helpers.r"),
+          file.path(r_dir, "utils.R"),
+          sort(list.files(r_dir, pattern = "\\.[Rr]$", full.names = TRUE))
+        )
+        r_files <- unique(r_files[file.exists(r_files)])
+        for (f in r_files) {
+          source(f, local = .GlobalEnv)
+        }
+        NULL
+      }, pkg_path)
     }
-    parallel::clusterCall(cl, function(path) {
-      pkgload::load_all(
-        path,
-        quiet = TRUE,
-        export_all = FALSE,
-        helpers = FALSE,
-        attach_testthat = FALSE
-      )
-      NULL
-    }, pkg_path)
   } else {
     if (verbose) {
       cat("Initializing workers with installed package", pkg, "\n")
