@@ -569,6 +569,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
 #' @param Sy Optional Y covariance matrix.
 #' @param lambda Regularization parameter.
 #' @param r Rank of the solution.
+#' @param mode Mode for postprocessing the RRR solution. One of `"sqrtm_norm"` (default) or `"product_norm"`. The former whitens the canonical variates to have identity covariance, while the latter does not whiten and instead returns the raw SVD factors of the RRR solution. The `"product_norm"` mode may be more interpretable in some cases but can yield canonical variates with very different scales and is not guaranteed to be numerically stable when the RRR solution is very low-rank or nearly low-rank.
 #' @param highdim Boolean for high-dimensional regime.
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
@@ -695,6 +696,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param kfolds Number of folds for cross-validation.
 #' @param lambdas Sequence of lambda values for cross-validation.
 #' @param parallelize Logical; should cross-validation be parallelized?
+#' @param mode Mode for postprocessing the RRR solution. One of `"sqrtm_norm"` (default) or `"product_norm"`. The former whitens the canonical variates to have identity covariance, while the latter does not whiten and instead returns the raw SVD factors of the RRR solution. The `"product_norm"` mode may be more interpretable in some cases but can yield canonical variates with very different scales and is not guaranteed to be numerically stable when the RRR solution is very low-rank or nearly low-rank.
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
 #' @param standardize Backward-compatible preprocessing flag: TRUE = `"scale"`, FALSE = `"center"`.
