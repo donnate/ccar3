@@ -22,12 +22,11 @@ Imports: methods, magrittr, tidyr, dplyr, foreach, pracma, corpcor,
         matrixStats, RSpectra
 Suggests: codetools, SMUT, igraph, testthat (>= 3.0.0), pkgload,
         rrpack, Matrix, glmnet, CCA, PMA, doParallel, crayon
-Enhances: CVXR
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Config/testthat/edition: 3
 NeedsCompilation: no
-Packaged: 2026-04-10 20:33:14 UTC; clairedonnat
-Built: R 4.4.3; ; 2026-04-10 20:33:21 UTC; unix
+Packaged: 2026-04-10 20:44:11 UTC; clairedonnat
+Built: R 4.4.3; ; 2026-04-10 20:44:19 UTC; unix

@@ -100,28 +100,36 @@ solve_group_rrr_admm <- function(X, tilde_Y, groups, lambda, Sx = NULL,
 # Helper: CVXR-based group sparse solver
 solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
 
-  if (!requireNamespace("CVXR", quietly = TRUE)) {
+  if (!nzchar(system.file(package = "CVXR"))) {
     stop("Package 'CVXR' must be installed to use the CVX solver.",
          call. = FALSE)
   }
 
   p <- ncol(X); q <- ncol(tilde_Y)
   n <- nrow(X)
-  B <- CVXR::Variable(c(p, q))
+  cvxr_variable <- getExportedValue("CVXR", "Variable")
+  cvxr_norm <- getExportedValue("CVXR", "norm")
+  cvxr_minimize <- getExportedValue("CVXR", "Minimize")
+  cvxr_sum_squares <- getExportedValue("CVXR", "sum_squares")
+  cvxr_problem <- getExportedValue("CVXR", "Problem")
+  cvxr_psolve <- getExportedValue("CVXR", "psolve")
+  cvxr_value <- getExportedValue("CVXR", "value")
+
+  B <- cvxr_variable(c(p, q))
   
   penalty_exprs <- lapply(groups, function(g) {
-    CVXR::norm(B[g, , drop = FALSE], "F")
+    cvxr_norm(B[g, , drop = FALSE], "F")
   })
   penalty <- Reduce(`+`, penalty_exprs)  # or do.call("+", penalty_exprs)
   
-  objective <- CVXR::Minimize(
-    1/n *  CVXR::sum_squares(tilde_Y - X %*% B) + lambda * penalty
+  objective <- cvxr_minimize(
+    1/n * cvxr_sum_squares(tilde_Y - X %*% B) + lambda * penalty
   )
   
-  prob <- CVXR::Problem(objective)
-  res <- CVXR::psolve(prob)
+  prob <- cvxr_problem(objective)
+  res <- cvxr_psolve(prob)
 
-  B_opt <- CVXR::value(B)
+  B_opt <- cvxr_value(B)
   B_opt[abs(B_opt) < thresh_0] <- 0
   return(B_opt)
 }

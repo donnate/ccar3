@@ -77,7 +77,7 @@ Files ‘README.md’ or ‘NEWS.md’ cannot be checked without ‘pandoc’ be
 * checking for unstated dependencies in examples ... OK
 * checking examples ... OK
 * checking for unstated dependencies in ‘tests’ ... OK
-* checking tests ... [24s/25s] OK
+* checking tests ... [25s/25s] OK
   Running ‘testthat.R’ [24s/25s]
 * checking for non-standard things in the check directory ... OK
 * checking for detritus in the temp directory ... OK

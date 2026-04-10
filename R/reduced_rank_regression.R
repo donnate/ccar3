@@ -519,7 +519,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
                            matrix_free_threshold = 4000L,
                            cg_tol = 1e-6,
                            cg_maxiter = NULL) {
-  if (!requireNamespace("CVXR", quietly = TRUE)) {
+  if (!nzchar(system.file(package = "CVXR"))) {
     stop("Package 'CVXR' must be installed to use the CVX solver.",
          call. = FALSE)
   }
@@ -548,18 +548,25 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
     return(fallback_admm("problem size is too large for CVXR canonicalization"))
   }
 
-  B <- CVXR::Variable(c(p, q))
+  cvxr_variable <- getExportedValue("CVXR", "Variable")
+  cvxr_norm <- getExportedValue("CVXR", "norm")
+  cvxr_minimize <- getExportedValue("CVXR", "Minimize")
+  cvxr_sum_squares <- getExportedValue("CVXR", "sum_squares")
+  cvxr_problem <- getExportedValue("CVXR", "Problem")
+  cvxr_psolve <- getExportedValue("CVXR", "psolve")
+
+  B <- cvxr_variable(c(p, q))
   
   row_penalty <- Reduce(
     `+`,
-    lapply(seq_len(p), function(j) CVXR::norm(B[j, , drop = FALSE], 2))
+    lapply(seq_len(p), function(j) cvxr_norm(B[j, , drop = FALSE], 2))
   )
-  objective <- CVXR::Minimize(
-    1 / n * CVXR::sum_squares(tilde_Y - X %*% B) + lambda * row_penalty
+  objective <- cvxr_minimize(
+    1 / n * cvxr_sum_squares(tilde_Y - X %*% B) + lambda * row_penalty
   )
   B_opt <- tryCatch({
-    problem <- CVXR::Problem(objective)
-    result <-  CVXR::psolve(problem)
+    problem <- cvxr_problem(objective)
+    result <- cvxr_psolve(problem)
     result$getValue(B)
   }, error = function(e) {
     msg <- conditionMessage(e)
@@ -900,10 +907,10 @@ cca_rrr_cv <- function(X, Y,
       ".safe_mean_na", ".safe_sd_na"
     )
     if (solver  %in% c("CVX", "CVXR" )){
-        if (!requireNamespace("CVXR", quietly = TRUE)) {
+        if (!nzchar(system.file(package = "CVXR"))) {
          stop("Package 'CVXR' must be installed to use the CVXR/CVX solver.",
-         call. = FALSE)
-          }
+              call. = FALSE)
+       }
 
       results_list <- foreach(
         lambda = lambdas,
