@@ -143,7 +143,8 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
 #' @param standardize Backward-compatible preprocessing flag: TRUE = `"scale"`, FALSE = `"center"`.
 #' @param preprocess Preprocessing mode. One of `"scale"` (center + scale), `"center"` (center only), or `"none"`.
 #' @param LW_Sy Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)
-#' @param solver Either "ADMM" or "CVXR"
+#' @param solver Either "ADMM" or "CVXR". The `"CVXR"` backend requires the
+#'   optional package `CVXR`.
 #' @param rho ADMM parameter
 #' @param niter Maximum number of ADMM iterations
 #' @param thresh Convergence threshold for ADMM
@@ -299,7 +300,8 @@ cca_group_rrr_cv_folds <- function(X, Y, groups, Sx = NULL, Sy = NULL, kfolds = 
 #' @param standardize Backward-compatible preprocessing flag: TRUE = `"scale"`, FALSE = `"center"`.
 #' @param preprocess Preprocessing mode. One of `"scale"` (center + scale), `"center"` (center only), or `"none"`.
 #' @param LW_Sy Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)
-#' @param solver Either "ADMM" or "CVXR"
+#' @param solver Either "ADMM" or "CVXR". The `"CVXR"` backend requires the
+#'   optional package `CVXR`.
 #' @param rho ADMM parameter
 #' @param niter Maximum number of ADMM iterations
 #' @param thresh Convergence threshold for ADMM

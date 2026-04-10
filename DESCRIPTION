@@ -35,13 +35,14 @@ Suggests:
     testthat (>= 3.0.0),
     pkgload,
     rrpack,
-    CVXR,
     Matrix,
     glmnet,
     CCA,
     PMA,
     doParallel,
     crayon
+Enhances:
+    CVXR
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

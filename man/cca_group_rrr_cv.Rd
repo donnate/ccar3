@@ -48,7 +48,8 @@ cca_group_rrr_cv(
 
 \item{LW_Sy}{Whether to apply Ledoit-Wolf shrinkage to Sy (default TRUE)}
 
-\item{solver}{Either "ADMM" or "CVXR"}
+\item{solver}{Either "ADMM" or "CVXR". The \code{"CVXR"} backend requires the
+optional package \code{CVXR}.}
 
 \item{rho}{ADMM parameter}
 

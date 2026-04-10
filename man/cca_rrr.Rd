@@ -42,7 +42,8 @@ cca_rrr(
 
 \item{highdim}{Boolean for high-dimensional regime.}
 
-\item{solver}{Solver type: "rrr", "CVX", or "ADMM".}
+\item{solver}{Solver type: "rrr", "CVX", or "ADMM". The \code{"CVX"} backend
+requires the optional package \code{CVXR}.}
 
 \item{LW_Sy}{Whether to use Ledoit-Wolf shrinkage for Sy.}
 

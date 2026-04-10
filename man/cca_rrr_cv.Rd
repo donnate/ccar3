@@ -39,7 +39,8 @@ cca_rrr_cv(
 
 \item{kfolds}{Number of folds for cross-validation.}
 
-\item{solver}{Solver type: "rrr", "CVX", or "ADMM".}
+\item{solver}{Solver type: "rrr", "CVX", or "ADMM". The \code{"CVX"} backend
+requires the optional package \code{CVXR}.}
 
 \item{mode}{Mode for postprocessing the RRR solution. One of \code{"sqrtm_norm"}
 (default) or \code{"product_norm"}. Legacy aliases \code{"new"} and \code{"old"} are

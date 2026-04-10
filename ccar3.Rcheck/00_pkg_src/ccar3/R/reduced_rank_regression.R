@@ -593,7 +593,8 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
 #'   different scales and is not guaranteed to be numerically stable when the
 #'   RRR solution is very low-rank or nearly low-rank.
 #' @param highdim Boolean for high-dimensional regime.
-#' @param solver Solver type: "rrr", "CVX", or "ADMM".
+#' @param solver Solver type: "rrr", "CVX", or "ADMM". The `"CVX"` backend
+#'   requires the optional package `CVXR`.
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
 #' @param standardize Backward-compatible preprocessing flag: TRUE = `"scale"`, FALSE = `"center"`.
 #' @param preprocess Preprocessing mode. One of `"scale"` (center + scale), `"center"` (center only), or `"none"`.
@@ -727,7 +728,8 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #'   interpretable in some cases but can yield canonical variates with very
 #'   different scales and is not guaranteed to be numerically stable when the
 #'   RRR solution is very low-rank or nearly low-rank.
-#' @param solver Solver type: "rrr", "CVX", or "ADMM".
+#' @param solver Solver type: "rrr", "CVX", or "ADMM". The `"CVX"` backend
+#'   requires the optional package `CVXR`.
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
 #' @param standardize Backward-compatible preprocessing flag: TRUE = `"scale"`, FALSE = `"center"`.
 #' @param preprocess Preprocessing mode. One of `"scale"` (center + scale), `"center"` (center only), or `"none"`.
