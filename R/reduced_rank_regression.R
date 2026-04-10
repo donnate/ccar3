@@ -112,9 +112,130 @@
   M
 }
 
+.rrr_match_cv_metric <- function(cv_metric) {
+  if (missing(cv_metric) || is.null(cv_metric) || length(cv_metric) == 0L || all(is.na(cv_metric))) {
+    metric <- "mse"
+  } else {
+    metric <- tolower(as.character(cv_metric[[1]]))
+  }
+
+  if (metric %in% c("mse", "rmse", "prediction")) {
+    return("mse")
+  }
+
+  if (metric %in% c("correlation", "cor", "corr", "association")) {
+    return("correlation")
+  }
+
+  stop(
+    "Unsupported `cv_metric`. Use one of: 'mse' or 'correlation'.",
+    call. = FALSE
+  )
+}
+
+.rrr_correlation_score <- function(X_scores, Y_scores) {
+  X_scores <- as.matrix(X_scores)
+  Y_scores <- as.matrix(Y_scores)
+
+  if (nrow(X_scores) == 0L || nrow(Y_scores) == 0L ||
+      ncol(X_scores) == 0L || ncol(Y_scores) == 0L) {
+    return(0)
+  }
+
+  x_sd <- apply(X_scores, 2, stats::sd)
+  y_sd <- apply(Y_scores, 2, stats::sd)
+
+  keep_x <- which(is.finite(x_sd) & x_sd > 0)
+  keep_y <- which(is.finite(y_sd) & y_sd > 0)
+
+  if (length(keep_x) == 0L || length(keep_y) == 0L) {
+    return(0)
+  }
+
+  C <- stats::cor(
+    X_scores[, keep_x, drop = FALSE],
+    Y_scores[, keep_y, drop = FALSE]
+  )
+  C[!is.finite(C)] <- 0
+
+  sum(svd(C, nu = 0, nv = 0)$d)
+}
+
+
+# .postprocess_rrr_fit <- function(Bhat, X, Y, sqrt_inv_Sy, r,
+#                                  ridge_whiten = 0, thresh_0 = 1e-6,
+#                                  verbose = FALSE) {
+#   n <- nrow(X)
+#   p <- ncol(X)
+#   q <- ncol(Y)
+
+#   if (all(abs(Bhat) < thresh_0)) {
+#     XU <- matrix(0, n, r)
+#     YV <- matrix(0, n, r)
+#     return(list(
+#       U = matrix(0, p, r),
+#       V = matrix(0, q, r),
+#       Lambda = rep(0, r),
+#       cor = rep(0, r),
+#       loss = mean((YV - XU)^2)
+#     ))
+#   }
+
+#   r_eff <- min(r, nrow(Bhat), ncol(Bhat))
+#   SVDs <- .rrr_safe_rank_svd(Bhat, r_eff, prefer_sparse = TRUE)
+#   if (is.null(SVDs)) {
+#     stop("SVD failed during reduced-rank postprocessing.", call. = FALSE)
+#   }
+
+#   U0 <- SVDs$u
+#   V0 <- sqrt_inv_Sy %*% SVDs$v
+
+#   XU0 <- X %*% U0
+#   YV0 <- Y %*% V0
+
+#   GX <- crossprod(XU0) / n + ridge_whiten * diag(r_eff)
+#   GY <- crossprod(YV0) / n + ridge_whiten * diag(r_eff)
+
+#   U <- U0 %*% .rrr_whiten_factor(GX, ridge = ridge_whiten, verbose = verbose)
+#   V <- V0 %*% .rrr_whiten_factor(GY, ridge = ridge_whiten, verbose = verbose)
+  
+
+#   XU <- X %*% U
+#   YV <- Y %*% V
+#   cor <- diag(crossprod(XU, YV) / n)
+
+#   neg <- cor < 0
+#   if (any(neg)) {
+#     V[, neg] <- -V[, neg, drop = FALSE]
+#     YV[, neg] <- -YV[, neg, drop = FALSE]
+#     cor[neg] <- -cor[neg]
+#   }
+
+#   ord <- order(cor, decreasing = TRUE)
+#   cor <- cor[ord]
+#   U <- U[, ord, drop = FALSE]
+#   V <- V[, ord, drop = FALSE]
+#   XU <- XU[, ord, drop = FALSE]
+#   YV <- YV[, ord, drop = FALSE]
+
+#   if (r_eff < r) {
+#     U <- cbind(U, matrix(0, p, r - r_eff))
+#     V <- cbind(V, matrix(0, q, r - r_eff))
+#     cor <- c(cor, rep(0, r - r_eff))
+#   }
+
+#   list(
+#     U = U,
+#     V = V,
+#     Lambda = cor,
+#     cor = cor,
+#     loss = mean((YV - XU)^2)
+#   )
+# }
+
 
 .postprocess_rrr_fit <- function(Bhat, X, Y, sqrt_inv_Sy, r,
-                                 ridge_whiten = 1e-8, thresh_0 = 1e-6,
+                                 ridge_whiten = 0, thresh_0 = 1e-6,
                                  verbose = FALSE) {
   n <- nrow(X)
   p <- ncol(X)
@@ -133,27 +254,26 @@
   }
 
   r_eff <- min(r, nrow(Bhat), ncol(Bhat))
+  active_rows <- which(rowSums(Bhat^2) > 0)
+  Sx_active = crossprod(X[, active_rows, drop = FALSE]) / n
   SVDs <- .rrr_safe_rank_svd(Bhat, r_eff, prefer_sparse = TRUE)
   if (is.null(SVDs)) {
     stop("SVD failed during reduced-rank postprocessing.", call. = FALSE)
   }
-
-  U0 <- SVDs$u
-  V0 <- sqrt_inv_Sy %*% SVDs$v
-
-  XU0 <- X %*% U0
-  YV0 <- Y %*% V0
-
-  GX <- crossprod(XU0) / n + ridge_whiten * diag(r_eff)
-  GY <- crossprod(YV0) / n + ridge_whiten * diag(r_eff)
-
-  U <- U0 %*% .rrr_whiten_factor(GX, ridge = ridge_whiten, verbose = verbose)
-  V <- V0 %*% .rrr_whiten_factor(GY, ridge = ridge_whiten, verbose = verbose)
+  if (length(active_rows) > r - 1) {
+      sqrt_Sx <- compute_sqrt(Sx_active)
+      sol <- svd(sqrt_Sx %*% Bhat[active_rows, ])
+      V <- sqrt_inv_Sy %*% sol$v[, 1:r]
+      inv_D <- diag(sapply(sol$d[1:r], function(d) ifelse(d < 1e-4, 0, 1 / d)))
+      U <- Bhat %*% sol$v[, 1:r] %*% inv_D
+    } else {
+      U <- matrix(0, p, r)
+      V <- matrix(0, q, r)
+    }
 
   XU <- X %*% U
   YV <- Y %*% V
   cor <- diag(crossprod(XU, YV) / n)
-
   neg <- cor < 0
   if (any(neg)) {
     V[, neg] <- -V[, neg, drop = FALSE]
@@ -424,7 +544,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
   )
   B_opt <- tryCatch({
     problem <- CVXR::Problem(objective)
-    result <- solve(problem)
+    result <-  CVXR::psolve(problem)
     result$getValue(B)
   }, error = function(e) {
     msg <- conditionMessage(e)
@@ -571,6 +691,9 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param rho ADMM parameter.
 #' @param niter Maximum number of iterations for ADMM.
 #' @param thresh Convergence threshold.
+#' @param cv_metric Cross-validation metric. Use `"mse"` to minimize held-out prediction
+#'   error or `"correlation"` to maximize held-out association between `X %*% U`
+#'   and `Y %*% V`.
 #' @param verbose Logical for verbose output.
 #' @param thresh_0 tolerance for declaring entries non-zero
 #' @param matrix_free_threshold For ADMM: when both `n` and `p` are at least this value, use a matrix-free conjugate-gradient solve instead of forming a dense linear system.
@@ -583,15 +706,20 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #'   \item{U}{Canonical direction matrix for X (p x r)}
 #'   \item{V}{Canonical direction matrix for Y (q x r)}
 #'   \item{lambda}{Optimal regularisation parameter lambda chosen by CV}
-#'   \item{rmse}{Mean squared error of prediction (as computed in the CV)}
+#'   \item{rmse}{Backward-compatible optimization objective. For `cv_metric = "mse"`
+#'   this is the held-out mean squared error; for `cv_metric = "correlation"` it is
+#'   `-cv_score` so that smaller still means better.}
+#'   \item{cv_score}{Raw held-out cross-validation score averaged across folds.}
+#'   \item{cv_metric}{The metric used to score lambdas during cross-validation.}
 #'   \item{cor}{Canonical correlations at the selected lambda}
 #'   \item{lambda_x}{Alias of the selected `lambda`}
 #'   \item{lambda_x_se}{Foldwise standard error at the selected `lambda`}
 #'   \item{lambda_y}{Placeholder for symmetry with two-penalty interfaces}
 #'   \item{lambda_y_se}{Placeholder for symmetry with two-penalty interfaces}
 #'   \item{resultsx}{Backward-compatible alias of `cv_summary`}
-#'   \item{cv_summary}{Data frame with one row per lambda containing mean RMSE and its foldwise standard error}
-#'   \item{cv_folds}{Data frame with fold-level RMSE values for each lambda}
+#'   \item{cv_summary}{Data frame with one row per lambda containing the mean CV score
+#'   and its foldwise standard error.}
+#'   \item{cv_folds}{Data frame with fold-level CV scores for each lambda.}
 #'   \item{Lambda}{Canonical correlations from the final fit}
 #'   \item{B}{Estimated reduced-rank coefficient matrix from the final fit}
 #'   \item{fit}{Final fit at the selected lambda}
@@ -608,6 +736,7 @@ cca_rrr_cv <- function(X, Y,
                        LW_Sy = TRUE,
                        standardize = FALSE,
                        preprocess = NULL,
+                       cv_metric = "mse",
                        rho=1,
                        thresh_0=0,
                        niter=1e4,
@@ -616,8 +745,8 @@ cca_rrr_cv <- function(X, Y,
                        cg_maxiter = NULL,
                        thresh = 1e-4, verbose=FALSE,
                        nb_cores = NULL) {
-  
   preprocess_mode <- .resolve_preprocess_mode(standardize = standardize, preprocess = preprocess)
+  cv_metric <- .rrr_match_cv_metric(cv_metric)
   X <- .preprocess_matrix(X, preprocess_mode)
   Y <- .preprocess_matrix(Y, preprocess_mode)
 
@@ -632,6 +761,7 @@ cca_rrr_cv <- function(X, Y,
       X, Y, Sx = Sx, Sy = Sy, kfolds = kfolds,
       LW_Sy = LW_Sy,
       preprocess = "none",
+      cv_metric = cv_metric,
       lambda = lambda, r = r, solver = solver,
       rho = rho, niter = niter, thresh = thresh,
       matrix_free_threshold = matrix_free_threshold,
@@ -641,21 +771,30 @@ cca_rrr_cv <- function(X, Y,
       return_fold_values = TRUE
     )
 
+    fold_objective <- if (cv_metric == "mse") fold_values else -fold_values
+
     list(
       summary = data.frame(
         lambda = lambda,
-        rmse = safe_mean_na(fold_values),
+        rmse = safe_mean_na(fold_objective),
+        cv_score = safe_mean_na(fold_values),
+        cv_metric = cv_metric,
         se = safe_sd_na(fold_values) / sqrt(sum(!is.na(fold_values))),
         stringsAsFactors = FALSE
       ),
       fold = data.frame(
         lambda = lambda,
         fold = seq_along(fold_values),
-        rmse = fold_values,
+        rmse = fold_objective,
+        cv_score = fold_values,
+        cv_metric = cv_metric,
         stringsAsFactors = FALSE
       )
     )
   }
+
+  foreach <- foreach::foreach
+  `%dopar%` <- foreach::`%dopar%`
   
   if (parallelize && solver %in% c("CVX", "CVXR", "ADMM")) {
 
@@ -706,7 +845,8 @@ cca_rrr_cv <- function(X, Y,
       "make_invSx_apply", ".rrr_cg_solve", ".rrr_chol_jitter", ".resolve_preprocess_mode",
       ".preprocess_matrix", ".create_cv_folds",
       ".rrr_invsqrt_psd", ".rrr_whiten_factor", ".rrr_safe_rank_svd",
-      ".postprocess_rrr_fit", "compute_sqrt_inv",
+      ".postprocess_rrr_fit", "compute_sqrt_inv", ".rrr_match_cv_metric",
+      ".rrr_correlation_score",
       ".safe_mean_na", ".safe_sd_na"
     )
     if (solver  %in% c("CVX", "CVXR" )){
@@ -739,13 +879,26 @@ cca_rrr_cv <- function(X, Y,
   cv_summary <- dplyr::bind_rows(lapply(results_list, `[[`, "summary"))
   cv_folds <- dplyr::bind_rows(lapply(results_list, `[[`, "fold"))
 
-  cv_summary <- cv_summary %>% 
-    dplyr::mutate(rmse = ifelse(is.na(rmse) | rmse == 0, 1e8, rmse)) %>%
-    dplyr::filter(rmse > 1e-5)
+  if (cv_metric == "mse") {
+    cv_summary <- cv_summary %>% 
+      dplyr::mutate(rmse = ifelse(is.na(rmse) | rmse == 0, 1e8, rmse)) %>%
+      dplyr::filter(rmse > 1e-5)
+  } else {
+    cv_summary <- cv_summary %>%
+      dplyr::filter(is.finite(cv_score))
+  }
   
   resultsx <- cv_summary
 
-  opt_lambda <- cv_summary$lambda[which.min(cv_summary$rmse)]
+  if (nrow(cv_summary) == 0L) {
+    stop("No valid lambda values were found during cross-validation.", call. = FALSE)
+  }
+
+  opt_lambda <- if (cv_metric == "mse") {
+    cv_summary$lambda[which.min(cv_summary$rmse)]
+  } else {
+    cv_summary$lambda[which.max(cv_summary$cv_score)]
+  }
   opt_lambda <- ifelse(is.na(opt_lambda), 0.1, opt_lambda)
 
   final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, 
@@ -764,6 +917,8 @@ cca_rrr_cv <- function(X, Y,
        V = final$V,
        lambda = opt_lambda,
        rmse = cv_summary$rmse,
+       cv_score = cv_summary$cv_score,
+       cv_metric = cv_metric,
        cor = final$cor,
        lambda_x = opt_lambda,
        lambda_x_se = cv_summary$se[match(opt_lambda, cv_summary$lambda)],
@@ -786,6 +941,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                              r=2,
                              solver = "ADMM",
                              preprocess = "none",
+                             cv_metric = "mse",
                              rho=1,
                              LW_Sy = TRUE,
                              niter=1e4,
@@ -801,6 +957,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
   }
 
   preprocess_mode <- .resolve_preprocess_mode(standardize = FALSE, preprocess = preprocess)
+  cv_metric <- .rrr_match_cv_metric(cv_metric)
   X <- .preprocess_matrix(X, preprocess_mode)
   Y <- .preprocess_matrix(Y, preprocess_mode)
 
@@ -833,7 +990,11 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                        cg_maxiter = cg_maxiter,
                        thresh=thresh, thresh_0=thresh_0,
                        verbose=FALSE)
-      mean((X_val %*% final$U - Y_val %*% final$V)^2)
+      if (cv_metric == "mse") {
+        mean((X_val %*% final$U - Y_val %*% final$V)^2)
+      } else {
+        .rrr_correlation_score(X_val %*% final$U, Y_val %*% final$V)
+      }
     }, error = function(e) {
       message("Error in fold ", i, ": ", conditionMessage(e))
       NA_real_
@@ -841,6 +1002,8 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
   }, numeric(1))
   
   if (return_fold_values) return(rmse)
-  if (all(is.na(rmse))) return(1e8)
+  if (all(is.na(rmse))) {
+    return(if (cv_metric == "mse") 1e8 else NA_real_)
+  }
   mean(rmse, na.rm = TRUE)
 }
