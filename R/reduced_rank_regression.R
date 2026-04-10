@@ -183,6 +183,75 @@
   )
 }
 
+.postprocess_rrr_fit_old <- function(Bhat, X, Y, sqrt_inv_Sy, r,
+                                 ridge_whiten = 0, thresh_0 = 1e-6,
+                                 verbose = FALSE) {
+  n <- nrow(X)
+  p <- ncol(X)
+  q <- ncol(Y)
+
+  if (all(abs(Bhat) < thresh_0)) {
+    XU <- matrix(0, n, r)
+    YV <- matrix(0, n, r)
+    return(list(
+      U = matrix(0, p, r),
+      V = matrix(0, q, r),
+      Lambda = rep(0, r),
+      cor = rep(0, r),
+      loss = mean((YV - XU)^2)
+    ))
+  }
+
+  r_eff <- min(r, nrow(Bhat), ncol(Bhat))
+  active_rows <- which(rowSums(Bhat^2) > 0)
+  Sx_active = crossprod(X[, active_rows, drop = FALSE]) / n
+  SVDs <- .rrr_safe_rank_svd(Bhat, r_eff, prefer_sparse = TRUE)
+  if (is.null(SVDs)) {
+    stop("SVD failed during reduced-rank postprocessing.", call. = FALSE)
+  }
+  if (length(active_rows) > r - 1) {
+      sqrt_Sx <- compute_sqrt(Sx_active)
+      sol <- svd(sqrt_Sx %*% Bhat[active_rows, ])
+      V <- sqrt_inv_Sy %*% sol$v[, 1:r]
+      inv_D <- diag(sapply(sol$d[1:r], function(d) ifelse(d < 1e-4, 0, 1 / d)))
+      U <- Bhat %*% sol$v[, 1:r] %*% inv_D
+    } else {
+      U <- matrix(0, p, r)
+      V <- matrix(0, q, r)
+    }
+
+  XU <- X %*% U
+  YV <- Y %*% V
+  cor <- diag(crossprod(XU, YV) / n)
+  neg <- cor < 0
+  if (any(neg)) {
+    V[, neg] <- -V[, neg, drop = FALSE]
+    YV[, neg] <- -YV[, neg, drop = FALSE]
+    cor[neg] <- -cor[neg]
+  }
+
+  ord <- order(cor, decreasing = TRUE)
+  cor <- cor[ord]
+  U <- U[, ord, drop = FALSE]
+  V <- V[, ord, drop = FALSE]
+  XU <- XU[, ord, drop = FALSE]
+  YV <- YV[, ord, drop = FALSE]
+
+  if (r_eff < r) {
+    U <- cbind(U, matrix(0, p, r - r_eff))
+    V <- cbind(V, matrix(0, q, r - r_eff))
+    cor <- c(cor, rep(0, r - r_eff))
+  }
+
+  list(
+    U = U,
+    V = V,
+    Lambda = cor,
+    cor = cor,
+    loss = mean((YV - XU)^2)
+  )
+}
+
 
 .rrr_cg_solve <- function(A_mul, b, M_inv = NULL, tol = 1e-6,
                           maxiter = NULL, x0 = NULL) {
@@ -478,6 +547,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                     r, highdim=TRUE, 
                     solver="ADMM",
                     LW_Sy = TRUE,
+                    mode = "new",
                     standardize = FALSE,
                     preprocess = NULL,
                     rho=1,
@@ -539,12 +609,24 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
   }
   
   B_fit[abs(B_fit) < thresh_0] <- 0
-  post <- .postprocess_rrr_fit(
+  if(mode =="product_norm"){
+    post <- .postprocess_rrr_fit_old(
     B_fit, X, Y, sqrt_inv_Sy, r,
-    ridge_whiten = max(thresh_0, 1e-8),
+    ridge_whiten = max(thresh_0, 1e-18),
     thresh_0 = thresh_0,
     verbose = verbose
   )
+
+  }else{
+    post <- .postprocess_rrr_fit(
+    B_fit, X, Y, sqrt_inv_Sy, r,
+    ridge_whiten = max(thresh_0, 1e-18),
+    thresh_0 = thresh_0,
+    verbose = verbose
+  )
+
+  }
+
 
   list(U = post$U, V = post$V, Lambda = post$Lambda, loss = post$loss, cor = post$cor, B_opt = B_fit)
 }
@@ -604,6 +686,7 @@ cca_rrr_cv <- function(X, Y,
                        lambdas=10^seq(-3, 1.5, length.out = 100),
                        kfolds=10,
                        solver="ADMM",
+                       mode = "new",
                        parallelize = FALSE,
                        LW_Sy = TRUE,
                        standardize = FALSE,
@@ -632,6 +715,7 @@ cca_rrr_cv <- function(X, Y,
       X, Y, Sx = Sx, Sy = Sy, kfolds = kfolds,
       LW_Sy = LW_Sy,
       preprocess = "none",
+      mode = mode,
       lambda = lambda, r = r, solver = solver,
       rho = rho, niter = niter, thresh = thresh,
       matrix_free_threshold = matrix_free_threshold,
@@ -751,6 +835,7 @@ cca_rrr_cv <- function(X, Y,
   final <- cca_rrr(X, Y, Sx=NULL, Sy=NULL, 
                    lambda=opt_lambda, r=r,
                    highdim=TRUE, solver=solver,
+                   mode =mode,
                    standardize=FALSE, preprocess="none",
                    LW_Sy=LW_Sy, rho=rho, niter=niter, 
                    matrix_free_threshold = matrix_free_threshold,
@@ -785,6 +870,8 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                              lambda=0.01,
                              r=2,
                              solver = "ADMM",
+                             mode = "new",
+                             standardize = FALSE,
                              preprocess = "none",
                              rho=1,
                              LW_Sy = TRUE,
@@ -825,6 +912,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
     tryCatch({
       final <- cca_rrr(X_train, Y_train, 
                        Sx=Sx_train, Sy=Sy_train, highdim=TRUE,
+                       mode =mode,
                        lambda=lambda, r=r, solver=solver,
                        LW_Sy=LW_Sy, standardize=FALSE, preprocess="none",
                        rho=rho, niter=niter, 
