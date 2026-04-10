@@ -1,7 +1,7 @@
 library(ccar3)
 
 expected_cv_names <- c(
-  "U", "V", "lambda", "rmse", "cor",
+  "U", "V", "lambda", "rmse", "cv_score", "cv_metric", "cor",
   "lambda_x", "lambda_x_se", "lambda_y", "lambda_y_se",
   "resultsx", "cv_summary", "cv_folds", "Lambda", "B", "fit"
 )

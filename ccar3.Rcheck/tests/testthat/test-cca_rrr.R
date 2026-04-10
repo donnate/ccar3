@@ -30,7 +30,7 @@ test_that("cca_rrr returns the correct answer", {
   X = gen$X
   Y = gen$Y
 
-  result <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0, r, highdim=TRUE,
+  result <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0, highdim=TRUE,
                     LW_Sy = TRUE, solver = "ADMM")
   
   expect_type(result, "list")

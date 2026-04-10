@@ -8,7 +8,7 @@
 * using session charset: UTF-8
 * using options ‘--no-manual --as-cran’
 * checking for file ‘ccar3/DESCRIPTION’ ... OK
-* this is package ‘ccar3’ version ‘0.1.0’
+* this is package ‘ccar3’ version ‘0.1.1’
 * package encoding: UTF-8
 * checking CRAN incoming feasibility ... NOTE
 Maintainer: ‘Claire Donnat <cdonnat@uchicago.edu>’
@@ -77,8 +77,8 @@ Files ‘README.md’ or ‘NEWS.md’ cannot be checked without ‘pandoc’ be
 * checking for unstated dependencies in examples ... OK
 * checking examples ... OK
 * checking for unstated dependencies in ‘tests’ ... OK
-* checking tests ... [25s/25s] OK
-  Running ‘testthat.R’ [25s/25s]
+* checking tests ... [24s/24s] OK
+  Running ‘testthat.R’ [24s/24s]
 * checking for non-standard things in the check directory ... OK
 * checking for detritus in the temp directory ... OK
 * DONE

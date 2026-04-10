@@ -902,4 +902,4 @@ Final ADMM refit completed.
 > 
 > proc.time()
    user  system elapsed 
- 23.032   1.638  25.050 
+ 21.912   1.580  23.691 

@@ -14,6 +14,7 @@ cca_rrr(
   highdim = TRUE,
   solver = "ADMM",
   LW_Sy = TRUE,
+  mode = "sqrtm_norm",
   standardize = FALSE,
   preprocess = NULL,
   rho = 1,
@@ -44,6 +45,15 @@ cca_rrr(
 \item{solver}{Solver type: "rrr", "CVX", or "ADMM".}
 
 \item{LW_Sy}{Whether to use Ledoit-Wolf shrinkage for Sy.}
+
+\item{mode}{Mode for postprocessing the RRR solution. One of \code{"sqrtm_norm"}
+(default) or \code{"product_norm"}. Legacy aliases \code{"new"} and \code{"old"} are
+also accepted. The former whitens the canonical variates to have identity
+covariance, while the latter does not whiten and instead returns the raw
+SVD factors of the RRR solution. The \code{"product_norm"} mode may be more
+interpretable in some cases but can yield canonical variates with very
+different scales and is not guaranteed to be numerically stable when the
+RRR solution is very low-rank or nearly low-rank.}
 
 \item{standardize}{Backward-compatible preprocessing flag: TRUE = \code{"scale"}, FALSE = \code{"center"}.}
 

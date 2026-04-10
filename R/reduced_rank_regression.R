@@ -112,6 +112,21 @@
   M
 }
 
+.rrr_match_mode <- function(mode) {
+  if (missing(mode) || is.null(mode) || length(mode) == 0L || all(is.na(mode))) {
+    return("sqrtm_norm")
+  }
+
+  mode <- tolower(as.character(mode[[1]]))
+  if (identical(mode, "new")) {
+    mode <- "sqrtm_norm"
+  } else if (identical(mode, "old")) {
+    mode <- "product_norm"
+  }
+
+  match.arg(mode, c("sqrtm_norm", "product_norm"))
+}
+
 .rrr_match_cv_metric <- function(cv_metric) {
   if (missing(cv_metric) || is.null(cv_metric) || length(cv_metric) == 0L || all(is.na(cv_metric))) {
     metric <- "mse"
@@ -569,7 +584,14 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
 #' @param Sy Optional Y covariance matrix.
 #' @param lambda Regularization parameter.
 #' @param r Rank of the solution.
-#' @param mode Mode for postprocessing the RRR solution. One of `"sqrtm_norm"` (default) or `"product_norm"`. The former whitens the canonical variates to have identity covariance, while the latter does not whiten and instead returns the raw SVD factors of the RRR solution. The `"product_norm"` mode may be more interpretable in some cases but can yield canonical variates with very different scales and is not guaranteed to be numerically stable when the RRR solution is very low-rank or nearly low-rank.
+#' @param mode Mode for postprocessing the RRR solution. One of `"sqrtm_norm"`
+#'   (default) or `"product_norm"`. Legacy aliases `"new"` and `"old"` are
+#'   also accepted. The former whitens the canonical variates to have identity
+#'   covariance, while the latter does not whiten and instead returns the raw
+#'   SVD factors of the RRR solution. The `"product_norm"` mode may be more
+#'   interpretable in some cases but can yield canonical variates with very
+#'   different scales and is not guaranteed to be numerically stable when the
+#'   RRR solution is very low-rank or nearly low-rank.
 #' @param highdim Boolean for high-dimensional regime.
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
@@ -611,6 +633,7 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
                     verbose=FALSE) {
   
   preprocess_mode <- .resolve_preprocess_mode(standardize = standardize, preprocess = preprocess)
+  mode <- .rrr_match_mode(mode)
   X <- .preprocess_matrix(X, preprocess_mode)
   Y <- .preprocess_matrix(Y, preprocess_mode)
 
@@ -696,7 +719,14 @@ cca_rrr <- function(X, Y, Sx=NULL, Sy=NULL,
 #' @param kfolds Number of folds for cross-validation.
 #' @param lambdas Sequence of lambda values for cross-validation.
 #' @param parallelize Logical; should cross-validation be parallelized?
-#' @param mode Mode for postprocessing the RRR solution. One of `"sqrtm_norm"` (default) or `"product_norm"`. The former whitens the canonical variates to have identity covariance, while the latter does not whiten and instead returns the raw SVD factors of the RRR solution. The `"product_norm"` mode may be more interpretable in some cases but can yield canonical variates with very different scales and is not guaranteed to be numerically stable when the RRR solution is very low-rank or nearly low-rank.
+#' @param mode Mode for postprocessing the RRR solution. One of `"sqrtm_norm"`
+#'   (default) or `"product_norm"`. Legacy aliases `"new"` and `"old"` are
+#'   also accepted. The former whitens the canonical variates to have identity
+#'   covariance, while the latter does not whiten and instead returns the raw
+#'   SVD factors of the RRR solution. The `"product_norm"` mode may be more
+#'   interpretable in some cases but can yield canonical variates with very
+#'   different scales and is not guaranteed to be numerically stable when the
+#'   RRR solution is very low-rank or nearly low-rank.
 #' @param solver Solver type: "rrr", "CVX", or "ADMM".
 #' @param LW_Sy Whether to use Ledoit-Wolf shrinkage for Sy.
 #' @param standardize Backward-compatible preprocessing flag: TRUE = `"scale"`, FALSE = `"center"`.
@@ -747,7 +777,7 @@ cca_rrr_cv <- function(X, Y,
                        lambdas=10^seq(-3, 1.5, length.out = 100),
                        kfolds=10,
                        solver="ADMM",
-                       mode = "new",
+                       mode = "sqrtm_norm",
                        parallelize = FALSE,
                        LW_Sy = TRUE,
                        standardize = FALSE,
@@ -762,6 +792,7 @@ cca_rrr_cv <- function(X, Y,
                        thresh = 1e-4, verbose=FALSE,
                        nb_cores = NULL) {
   preprocess_mode <- .resolve_preprocess_mode(standardize = standardize, preprocess = preprocess)
+  mode <- .rrr_match_mode(mode)
   cv_metric <- .rrr_match_cv_metric(cv_metric)
   X <- .preprocess_matrix(X, preprocess_mode)
   Y <- .preprocess_matrix(Y, preprocess_mode)
@@ -901,8 +932,7 @@ cca_rrr_cv <- function(X, Y,
       dplyr::mutate(rmse = ifelse(is.na(rmse) | rmse == 0, 1e8, rmse)) %>%
       dplyr::filter(rmse > 1e-5)
   } else {
-    cv_summary <- cv_summary %>%
-      dplyr::filter(is.finite(cv_score))
+    cv_summary <- cv_summary[is.finite(cv_summary$cv_score), , drop = FALSE]
   }
   
   resultsx <- cv_summary
@@ -958,7 +988,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
                              lambda=0.01,
                              r=2,
                              solver = "ADMM",
-                             mode = "new",
+                             mode = "sqrtm_norm",
                              standardize = FALSE,
                              preprocess = "none",
                              cv_metric = "mse",
@@ -977,6 +1007,7 @@ cca_rrr_cv_folds <- function(X, Y, Sx, Sy, kfolds=5,
   }
 
   preprocess_mode <- .resolve_preprocess_mode(standardize = FALSE, preprocess = preprocess)
+  mode <- .rrr_match_mode(mode)
   cv_metric <- .rrr_match_cv_metric(cv_metric)
   X <- .preprocess_matrix(X, preprocess_mode)
   Y <- .preprocess_matrix(Y, preprocess_mode)
