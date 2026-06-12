@@ -114,6 +114,7 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
   cvxr_problem <- getExportedValue("CVXR", "Problem")
   cvxr_psolve <- getExportedValue("CVXR", "psolve")
   cvxr_value <- getExportedValue("CVXR", "value")
+  cvxr_solver <- .cvxr_preferred_solver()
 
   B <- cvxr_variable(c(p, q))
   
@@ -127,7 +128,19 @@ solve_group_rrr_cvxr <- function(X, tilde_Y, groups, lambda, thresh_0 = 1e-6) {
   )
   
   prob <- cvxr_problem(objective)
-  res <- cvxr_psolve(prob)
+  tryCatch(
+    if (is.null(cvxr_solver)) {
+      cvxr_psolve(prob)
+    } else {
+      cvxr_psolve(prob, solver = cvxr_solver)
+    },
+    error = function(e) {
+      if (.cvxr_mosek_error(e)) {
+        .stop_unusable_mosek()
+      }
+      stop(e)
+    }
+  )
 
   B_opt <- cvxr_value(B)
   B_opt[abs(B_opt) < thresh_0] <- 0

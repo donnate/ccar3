@@ -4,11 +4,11 @@
 * R was compiled by
     Apple clang version 14.0.0 (clang-1400.0.29.202)
     GNU Fortran (GCC) 12.2.0
-* running under: macOS Sequoia 15.1
+* running under: macOS 26.5.1
 * using session charset: UTF-8
-* using options ‘--no-manual --as-cran’
+* using option ‘--as-cran’
 * checking for file ‘ccar3/DESCRIPTION’ ... OK
-* this is package ‘ccar3’ version ‘0.1.1’
+* this is package ‘ccar3’ version ‘0.1.2’
 * package encoding: UTF-8
 * checking CRAN incoming feasibility ... NOTE
 Maintainer: ‘Claire Donnat <cdonnat@uchicago.edu>’
@@ -48,8 +48,7 @@ Found the following (possibly) invalid ORCID iDs:
 * checking for future file timestamps ... NOTE
 unable to verify current time
 * checking DESCRIPTION meta-information ... OK
-* checking top-level files ... NOTE
-Files ‘README.md’ or ‘NEWS.md’ cannot be checked without ‘pandoc’ being installed.
+* checking top-level files ... OK
 * checking for left-over files ... OK
 * checking index information ... OK
 * checking package subdirectories ... OK
@@ -77,8 +76,178 @@ Files ‘README.md’ or ‘NEWS.md’ cannot be checked without ‘pandoc’ be
 * checking for unstated dependencies in examples ... OK
 * checking examples ... OK
 * checking for unstated dependencies in ‘tests’ ... OK
-* checking tests ... [25s/25s] OK
-  Running ‘testthat.R’ [24s/25s]
+* checking tests ... [18s/18s] OK
+  Running ‘testthat.R’ [18s/18s]
+* checking PDF version of manual ... OK
+* checking HTML version of manual ... NOTE
+Found the following HTML validation problems:
+FPR.html:15:44 (FPR.Rd:5): Error: <main> is not recognized!
+FPR.html:15:44 (FPR.Rd:5): Warning: discarding unexpected <main>
+FPR.html:64:1 (FPR.Rd:25): Warning: discarding unexpected </main>
+FPR.html:4:1 (FPR.Rd:5): Warning: <link> inserting "type" attribute
+FPR.html:12:1 (FPR.Rd:5): Warning: <script> proprietary attribute "onload"
+FPR.html:12:1 (FPR.Rd:5): Warning: <script> inserting "type" attribute
+FPR.html:17:1 (FPR.Rd:5): Warning: <table> lacks "summary" attribute
+FPR.html:35:1 (FPR.Rd:10): Warning: <table> lacks "summary" attribute
+SCCA_Parkhomenko.html:15:44 (SCCA_Parkhomenko.Rd:5): Error: <main> is not recognized!
+SCCA_Parkhomenko.html:15:44 (SCCA_Parkhomenko.Rd:5): Warning: discarding unexpected <main>
+SCCA_Parkhomenko.html:92:1 (SCCA_Parkhomenko.Rd:39): Warning: discarding unexpected </main>
+SCCA_Parkhomenko.html:4:1 (SCCA_Parkhomenko.Rd:5): Warning: <link> inserting "type" attribute
+SCCA_Parkhomenko.html:12:1 (SCCA_Parkhomenko.Rd:5): Warning: <script> proprietary attribute "onload"
+SCCA_Parkhomenko.html:12:1 (SCCA_Parkhomenko.Rd:5): Warning: <script> inserting "type" attribute
+SCCA_Parkhomenko.html:17:1 (SCCA_Parkhomenko.Rd:5): Warning: <table> lacks "summary" attribute
+SCCA_Parkhomenko.html:45:1 (SCCA_Parkhomenko.Rd:19): Warning: <table> lacks "summary" attribute
+SparseCCA.html:15:44 (SparseCCA.Rd:5): Error: <main> is not recognized!
+SparseCCA.html:15:44 (SparseCCA.Rd:5): Warning: discarding unexpected <main>
+SparseCCA.html:119:1 (SparseCCA.Rd:55): Warning: discarding unexpected </main>
+SparseCCA.html:4:1 (SparseCCA.Rd:5): Warning: <link> inserting "type" attribute
+SparseCCA.html:12:1 (SparseCCA.Rd:5): Warning: <script> proprietary attribute "onload"
+SparseCCA.html:12:1 (SparseCCA.Rd:5): Warning: <script> inserting "type" attribute
+SparseCCA.html:17:1 (SparseCCA.Rd:5): Warning: <table> lacks "summary" attribute
+SparseCCA.html:50:1 (SparseCCA.Rd:24): Warning: <table> lacks "summary" attribute
+TNR.html:15:44 (TNR.Rd:5): Error: <main> is not recognized!
+TNR.html:15:44 (TNR.Rd:5): Warning: discarding unexpected <main>
+TNR.html:56:1 (TNR.Rd:17): Warning: discarding unexpected </main>
+TNR.html:4:1 (TNR.Rd:5): Warning: <link> inserting "type" attribute
+TNR.html:12:1 (TNR.Rd:5): Warning: <script> proprietary attribute "onload"
+TNR.html:12:1 (TNR.Rd:5): Warning: <script> inserting "type" attribute
+TNR.html:17:1 (TNR.Rd:5): Warning: <table> lacks "summary" attribute
+TNR.html:35:1 (TNR.Rd:10): Warning: <table> lacks "summary" attribute
+TPR.html:15:44 (TPR.Rd:5): Error: <main> is not recognized!
+TPR.html:15:44 (TPR.Rd:5): Warning: discarding unexpected <main>
+TPR.html:64:1 (TPR.Rd:25): Warning: discarding unexpected </main>
+TPR.html:4:1 (TPR.Rd:5): Warning: <link> inserting "type" attribute
+TPR.html:12:1 (TPR.Rd:5): Warning: <script> proprietary attribute "onload"
+TPR.html:12:1 (TPR.Rd:5): Warning: <script> inserting "type" attribute
+TPR.html:17:1 (TPR.Rd:5): Warning: <table> lacks "summary" attribute
+TPR.html:35:1 (TPR.Rd:10): Warning: <table> lacks "summary" attribute
+Witten.CV.html:15:44 (Witten.CV.Rd:5): Error: <main> is not recognized!
+Witten.CV.html:15:44 (Witten.CV.Rd:5): Warning: discarding unexpected <main>
+Witten.CV.html:80:1 (Witten.CV.Rd:33): Warning: discarding unexpected </main>
+Witten.CV.html:4:1 (Witten.CV.Rd:5): Warning: <link> inserting "type" attribute
+Witten.CV.html:12:1 (Witten.CV.Rd:5): Warning: <script> proprietary attribute "onload"
+Witten.CV.html:12:1 (Witten.CV.Rd:5): Warning: <script> inserting "type" attribute
+Witten.CV.html:17:1 (Witten.CV.Rd:5): Warning: <table> lacks "summary" attribute
+Witten.CV.html:43:1 (Witten.CV.Rd:18): Warning: <table> lacks "summary" attribute
+cca_graph_rrr.html:15:44 (cca_graph_rrr.Rd:5): Error: <main> is not recognized!
+cca_graph_rrr.html:15:44 (cca_graph_rrr.Rd:5): Warning: discarding unexpected <main>
+cca_graph_rrr.html:147:1 (cca_graph_rrr.Rd:71): Warning: discarding unexpected </main>
+cca_graph_rrr.html:4:1 (cca_graph_rrr.Rd:5): Warning: <link> inserting "type" attribute
+cca_graph_rrr.html:12:1 (cca_graph_rrr.Rd:5): Warning: <script> proprietary attribute "onload"
+cca_graph_rrr.html:12:1 (cca_graph_rrr.Rd:5): Warning: <script> inserting "type" attribute
+cca_graph_rrr.html:17:1 (cca_graph_rrr.Rd:5): Warning: <table> lacks "summary" attribute
+cca_graph_rrr.html:54:1 (cca_graph_rrr.Rd:28): Warning: <table> lacks "summary" attribute
+cca_graph_rrr_cv.html:15:44 (cca_graph_rrr_cv.Rd:5): Error: <main> is not recognized!
+cca_graph_rrr_cv.html:15:44 (cca_graph_rrr_cv.Rd:5): Warning: discarding unexpected <main>
+cca_graph_rrr_cv.html:165:1 (cca_graph_rrr_cv.Rd:80): Warning: discarding unexpected </main>
+cca_graph_rrr_cv.html:4:1 (cca_graph_rrr_cv.Rd:5): Warning: <link> inserting "type" attribute
+cca_graph_rrr_cv.html:12:1 (cca_graph_rrr_cv.Rd:5): Warning: <script> proprietary attribute "onload"
+cca_graph_rrr_cv.html:12:1 (cca_graph_rrr_cv.Rd:5): Warning: <script> inserting "type" attribute
+cca_graph_rrr_cv.html:17:1 (cca_graph_rrr_cv.Rd:5): Warning: <table> lacks "summary" attribute
+cca_graph_rrr_cv.html:54:1 (cca_graph_rrr_cv.Rd:28): Warning: <table> lacks "summary" attribute
+cca_group_rrr.html:15:44 (cca_group_rrr.Rd:5): Error: <main> is not recognized!
+cca_group_rrr.html:15:44 (cca_group_rrr.Rd:5): Warning: discarding unexpected <main>
+cca_group_rrr.html:162:1 (cca_group_rrr.Rd:81): Warning: discarding unexpected </main>
+cca_group_rrr.html:4:1 (cca_group_rrr.Rd:5): Warning: <link> inserting "type" attribute
+cca_group_rrr.html:12:1 (cca_group_rrr.Rd:5): Warning: <script> proprietary attribute "onload"
+cca_group_rrr.html:12:1 (cca_group_rrr.Rd:5): Warning: <script> inserting "type" attribute
+cca_group_rrr.html:17:1 (cca_group_rrr.Rd:5): Warning: <table> lacks "summary" attribute
+cca_group_rrr.html:56:1 (cca_group_rrr.Rd:31): Warning: <table> lacks "summary" attribute
+cca_group_rrr_cv.html:15:44 (cca_group_rrr_cv.Rd:5): Error: <main> is not recognized!
+cca_group_rrr_cv.html:15:44 (cca_group_rrr_cv.Rd:5): Warning: discarding unexpected <main>
+cca_group_rrr_cv.html:180:1 (cca_group_rrr_cv.Rd:90): Warning: discarding unexpected </main>
+cca_group_rrr_cv.html:4:1 (cca_group_rrr_cv.Rd:5): Warning: <link> inserting "type" attribute
+cca_group_rrr_cv.html:12:1 (cca_group_rrr_cv.Rd:5): Warning: <script> proprietary attribute "onload"
+cca_group_rrr_cv.html:12:1 (cca_group_rrr_cv.Rd:5): Warning: <script> inserting "type" attribute
+cca_group_rrr_cv.html:17:1 (cca_group_rrr_cv.Rd:5): Warning: <table> lacks "summary" attribute
+cca_group_rrr_cv.html:56:1 (cca_group_rrr_cv.Rd:31): Warning: <table> lacks "summary" attribute
+cca_rrr.html:15:44 (cca_rrr.Rd:5): Error: <main> is not recognized!
+cca_rrr.html:15:44 (cca_rrr.Rd:5): Warning: discarding unexpected <main>
+cca_rrr.html:169:1 (cca_rrr.Rd:87): Warning: discarding unexpected </main>
+cca_rrr.html:4:1 (cca_rrr.Rd:5): Warning: <link> inserting "type" attribute
+cca_rrr.html:12:1 (cca_rrr.Rd:5): Warning: <script> proprietary attribute "onload"
+cca_rrr.html:12:1 (cca_rrr.Rd:5): Warning: <script> inserting "type" attribute
+cca_rrr.html:17:1 (cca_rrr.Rd:5): Warning: <table> lacks "summary" attribute
+cca_rrr.html:56:1 (cca_rrr.Rd:31): Warning: <table> lacks "summary" attribute
+cca_rrr_cv.html:15:44 (cca_rrr_cv.Rd:5): Error: <main> is not recognized!
+cca_rrr_cv.html:15:44 (cca_rrr_cv.Rd:5): Warning: discarding unexpected <main>
+cca_rrr_cv.html:204:1 (cca_rrr_cv.Rd:109): Warning: discarding unexpected </main>
+cca_rrr_cv.html:4:1 (cca_rrr_cv.Rd:5): Warning: <link> inserting "type" attribute
+cca_rrr_cv.html:12:1 (cca_rrr_cv.Rd:5): Warning: <script> proprietary attribute "onload"
+cca_rrr_cv.html:12:1 (cca_rrr_cv.Rd:5): Warning: <script> inserting "type" attribute
+cca_rrr_cv.html:17:1 (cca_rrr_cv.Rd:5): Warning: <table> lacks "summary" attribute
+cca_rrr_cv.html:58:1 (cca_rrr_cv.Rd:32): Warning: <table> lacks "summary" attribute
+ccar3-package.html:15:44 (ccar3-package.Rd:7): Error: <main> is not recognized!
+ccar3-package.html:15:44 (ccar3-package.Rd:7): Warning: discarding unexpected <main>
+ccar3-package.html:43:1 (ccar3-package.Rd:19): Warning: discarding unexpected </main>
+ccar3-package.html:4:1 (ccar3-package.Rd:7): Warning: <link> inserting "type" attribute
+ccar3-package.html:12:1 (ccar3-package.Rd:7): Warning: <script> proprietary attribute "onload"
+ccar3-package.html:12:1 (ccar3-package.Rd:7): Warning: <script> inserting "type" attribute
+ccar3-package.html:17:1 (ccar3-package.Rd:7): Warning: <table> lacks "summary" attribute
+ecca.html:15:44 (ecca.Rd:5): Error: <main> is not recognized!
+ecca.html:15:44 (ecca.Rd:5): Warning: discarding unexpected <main>
+ecca.html:113:1 (ecca.Rd:53): Warning: discarding unexpected </main>
+ecca.html:4:1 (ecca.Rd:5): Warning: <link> inserting "type" attribute
+ecca.html:12:1 (ecca.Rd:5): Warning: <script> proprietary attribute "onload"
+ecca.html:12:1 (ecca.Rd:5): Warning: <script> inserting "type" attribute
+ecca.html:17:1 (ecca.Rd:5): Warning: <table> lacks "summary" attribute
+ecca.html:50:1 (ecca.Rd:24): Warning: <table> lacks "summary" attribute
+ecca.cv.html:15:44 (ecca.cv.Rd:5): Error: <main> is not recognized!
+ecca.cv.html:15:44 (ecca.cv.Rd:5): Warning: discarding unexpected <main>
+ecca.cv.html:162:1 (ecca.cv.Rd:82): Warning: discarding unexpected </main>
+ecca.cv.html:4:1 (ecca.cv.Rd:5): Warning: <link> inserting "type" attribute
+ecca.cv.html:12:1 (ecca.cv.Rd:5): Warning: <script> proprietary attribute "onload"
+ecca.cv.html:12:1 (ecca.cv.Rd:5): Warning: <script> inserting "type" attribute
+ecca.cv.html:17:1 (ecca.cv.Rd:5): Warning: <table> lacks "summary" attribute
+ecca.cv.html:60:1 (ecca.cv.Rd:34): Warning: <table> lacks "summary" attribute
+get_edge_incidence.html:15:44 (get_edge_incidence.Rd:5): Error: <main> is not recognized!
+get_edge_incidence.html:15:44 (get_edge_incidence.Rd:5): Warning: discarding unexpected <main>
+get_edge_incidence.html:52:1 (get_edge_incidence.Rd:15): Warning: discarding unexpected </main>
+get_edge_incidence.html:4:1 (get_edge_incidence.Rd:5): Warning: <link> inserting "type" attribute
+get_edge_incidence.html:12:1 (get_edge_incidence.Rd:5): Warning: <script> proprietary attribute "onload"
+get_edge_incidence.html:12:1 (get_edge_incidence.Rd:5): Warning: <script> inserting "type" attribute
+get_edge_incidence.html:17:1 (get_edge_incidence.Rd:5): Warning: <table> lacks "summary" attribute
+get_edge_incidence.html:35:1 (get_edge_incidence.Rd:10): Warning: <table> lacks "summary" attribute
+principal_angles.html:15:44 (principal_angles.Rd:5): Error: <main> is not recognized!
+principal_angles.html:15:44 (principal_angles.Rd:5): Warning: discarding unexpected <main>
+principal_angles.html:60:1 (principal_angles.Rd:23): Warning: discarding unexpected </main>
+principal_angles.html:4:1 (principal_angles.Rd:5): Warning: <link> inserting "type" attribute
+principal_angles.html:12:1 (principal_angles.Rd:5): Warning: <script> proprietary attribute "onload"
+principal_angles.html:12:1 (principal_angles.Rd:5): Warning: <script> inserting "type" attribute
+principal_angles.html:17:1 (principal_angles.Rd:5): Warning: <table> lacks "summary" attribute
+principal_angles.html:35:1 (principal_angles.Rd:10): Warning: <table> lacks "summary" attribute
+regular_cca.html:15:44 (regular_cca.Rd:5): Error: <main> is not recognized!
+regular_cca.html:15:44 (regular_cca.Rd:5): Warning: discarding unexpected <main>
+regular_cca.html:66:1 (regular_cca.Rd:22): Warning: discarding unexpected </main>
+regular_cca.html:4:1 (regular_cca.Rd:5): Warning: <link> inserting "type" attribute
+regular_cca.html:12:1 (regular_cca.Rd:5): Warning: <script> proprietary attribute "onload"
+regular_cca.html:12:1 (regular_cca.Rd:5): Warning: <script> inserting "type" attribute
+regular_cca.html:17:1 (regular_cca.Rd:5): Warning: <table> lacks "summary" attribute
+regular_cca.html:35:1 (regular_cca.Rd:10): Warning: <table> lacks "summary" attribute
+sinTheta.html:15:44 (sinTheta.Rd:5): Error: <main> is not recognized!
+sinTheta.html:15:44 (sinTheta.Rd:5): Warning: discarding unexpected <main>
+sinTheta.html:52:1 (sinTheta.Rd:15): Warning: discarding unexpected </main>
+sinTheta.html:4:1 (sinTheta.Rd:5): Warning: <link> inserting "type" attribute
+sinTheta.html:12:1 (sinTheta.Rd:5): Warning: <script> proprietary attribute "onload"
+sinTheta.html:12:1 (sinTheta.Rd:5): Warning: <script> inserting "type" attribute
+sinTheta.html:17:1 (sinTheta.Rd:5): Warning: <table> lacks "summary" attribute
+sinTheta.html:35:1 (sinTheta.Rd:10): Warning: <table> lacks "summary" attribute
+sparse_CCA_benchmarks.html:15:44 (sparse_CCA_benchmarks.Rd:5): Error: <main> is not recognized!
+sparse_CCA_benchmarks.html:15:44 (sparse_CCA_benchmarks.Rd:5): Warning: discarding unexpected <main>
+sparse_CCA_benchmarks.html:90:1 (sparse_CCA_benchmarks.Rd:39): Warning: discarding unexpected </main>
+sparse_CCA_benchmarks.html:4:1 (sparse_CCA_benchmarks.Rd:5): Warning: <link> inserting "type" attribute
+sparse_CCA_benchmarks.html:12:1 (sparse_CCA_benchmarks.Rd:5): Warning: <script> proprietary attribute "onload"
+sparse_CCA_benchmarks.html:12:1 (sparse_CCA_benchmarks.Rd:5): Warning: <script> inserting "type" attribute
+sparse_CCA_benchmarks.html:17:1 (sparse_CCA_benchmarks.Rd:5): Warning: <table> lacks "summary" attribute
+sparse_CCA_benchmarks.html:45:1 (sparse_CCA_benchmarks.Rd:20): Warning: <table> lacks "summary" attribute
+subdistance.html:15:44 (subdistance.Rd:5): Error: <main> is not recognized!
+subdistance.html:15:44 (subdistance.Rd:5): Warning: discarding unexpected <main>
+subdistance.html:52:1 (subdistance.Rd:15): Warning: discarding unexpected </main>
+subdistance.html:4:1 (subdistance.Rd:5): Warning: <link> inserting "type" attribute
+subdistance.html:12:1 (subdistance.Rd:5): Warning: <script> proprietary attribute "onload"
+subdistance.html:12:1 (subdistance.Rd:5): Warning: <script> inserting "type" attribute
+subdistance.html:17:1 (subdistance.Rd:5): Warning: <table> lacks "summary" attribute
+subdistance.html:35:1 (subdistance.Rd:10): Warning: <table> lacks "summary" attribute
 * checking for non-standard things in the check directory ... OK
 * checking for detritus in the temp directory ... OK
 * DONE

@@ -57,6 +57,66 @@ cleanup_parallel_backend <- function(cl = NULL, verbose = FALSE) {
   if (is.nan(out)) NA_real_ else out
 }
 
+.truthy_env <- function(name) {
+  value <- tolower(Sys.getenv(name, unset = "false"))
+  value %in% c("true", "1", "yes")
+}
+
+.cran_core_limit_active <- function() {
+  .truthy_env("_R_CHECK_LIMIT_CORES_")
+}
+
+.limit_parallel_cores <- function(num_cores) {
+  if (length(num_cores) == 0L) {
+    num_cores <- NA_integer_
+  } else {
+    num_cores <- suppressWarnings(as.integer(num_cores[[1L]]))
+  }
+  if (is.na(num_cores) || !is.finite(num_cores)) {
+    num_cores <- 1L
+  }
+
+  num_cores <- max(1L, num_cores)
+  if (.cran_core_limit_active()) {
+    num_cores <- min(num_cores, 2L)
+  }
+
+  num_cores
+}
+
+.cvxr_preferred_solver <- function(preferred = c("CLARABEL", "ECOS", "SCS")) {
+  if (!nzchar(system.file(package = "CVXR"))) {
+    return(NULL)
+  }
+
+  installed_solvers <- tryCatch(
+    getExportedValue("CVXR", "installed_solvers")(),
+    error = function(e) character()
+  )
+  installed_solvers <- toupper(as.character(installed_solvers))
+  preferred <- toupper(preferred)
+
+  solver <- preferred[preferred %in% installed_solvers]
+  if (length(solver) == 0L) {
+    return(NULL)
+  }
+
+  solver[[1L]]
+}
+
+.cvxr_mosek_error <- function(e) {
+  grepl("mosek|Rmosek|mosek_attachbuilder", conditionMessage(e), ignore.case = TRUE)
+}
+
+.stop_unusable_mosek <- function() {
+  stop(
+    "CVXR selected MOSEK, but Rmosek is not fully configured. ",
+    "Install a non-MOSEK CVXR solver such as CLARABEL, ECOS, or SCS, ",
+    "or use solver = 'ADMM'.",
+    call. = FALSE
+  )
+}
+
 .create_cv_folds <- function(n, k) {
   n <- as.integer(n)
   k <- as.integer(k)
@@ -244,7 +304,7 @@ setup_parallel_backend <- function(num_cores = NULL, verbose = FALSE) {
     num_cores <- if (n_cores_str == "") (parallel::detectCores() - 1) else as.integer(n_cores_str)
   }
   # Ensure we have at least 1 core
-  num_cores <- max(1, num_cores)
+  num_cores <- .limit_parallel_cores(num_cores)
   if (verbose){
      cat(paste("\nAttempting to set up parallel backend with", num_cores, "cores.\n"))
   }

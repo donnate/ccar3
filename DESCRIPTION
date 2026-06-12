@@ -1,7 +1,7 @@
 Package: ccar3
 Title: Canonical Correlation Analysis via Reduced Rank Regression
-Version: 0.1.1
-Date: 2026-04-10
+Version: 0.1.2
+Date: 2026-06-12
 Authors@R: c(
     person("Claire", "Donnat", , "cdonnat@uchicago.edu", 
            role = c("aut", "cre"),
@@ -38,6 +38,7 @@ Suggests:
     Matrix,
     glmnet,
     CCA,
+    CVXR,
     PMA,
     doParallel,
     crayon

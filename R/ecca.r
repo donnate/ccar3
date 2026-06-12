@@ -996,6 +996,7 @@ ecca.eval <- function(
   if (parallel) {
     cores <- if (is.null(nb_cores)) max(1L, parallel::detectCores() - 1L) else as.integer(nb_cores)
     cores <- min(cores, length(folds))
+    cores <- .limit_parallel_cores(cores)
     Sys.setenv(
       OMP_NUM_THREADS = 1,
       OPENBLAS_NUM_THREADS = 1,

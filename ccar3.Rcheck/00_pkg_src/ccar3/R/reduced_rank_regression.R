@@ -554,6 +554,7 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
   cvxr_sum_squares <- getExportedValue("CVXR", "sum_squares")
   cvxr_problem <- getExportedValue("CVXR", "Problem")
   cvxr_psolve <- getExportedValue("CVXR", "psolve")
+  cvxr_solver <- .cvxr_preferred_solver()
 
   B <- cvxr_variable(c(p, q))
   
@@ -566,12 +567,19 @@ solve_rrr_cvxr <- function(X, tilde_Y, lambda, thresh_0=1e-6,
   )
   B_opt <- tryCatch({
     problem <- cvxr_problem(objective)
-    result <- cvxr_psolve(problem)
+    result <- if (is.null(cvxr_solver)) {
+      cvxr_psolve(problem)
+    } else {
+      cvxr_psolve(problem, solver = cvxr_solver)
+    }
     result$getValue(B)
   }, error = function(e) {
     msg <- conditionMessage(e)
     if (grepl("memory|vector memory|sparse->dense|cannot allocate", msg, ignore.case = TRUE)) {
       return(fallback_admm(msg))
+    }
+    if (.cvxr_mosek_error(e)) {
+      .stop_unusable_mosek()
     }
     stop(e)
   })
@@ -879,6 +887,7 @@ cca_rrr_cv <- function(X, Y,
         nb_cores_effective <- min(as.integer(nb_cores), kfolds, length(lambdas))
       }
       nb_cores_effective <- max(1L, nb_cores_effective)
+      nb_cores_effective <- .limit_parallel_cores(nb_cores_effective)
       cl <- setup_parallel_backend(nb_cores_effective)
       
       if (!is.null(cl)) {

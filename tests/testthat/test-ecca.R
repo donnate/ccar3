@@ -73,6 +73,7 @@ test_that("ecca.cv returns the correct answer", {
 
 test_that("ecca.cv parallelization works", {
   skip_if_not_installed("doParallel")
+  skip_if_cran_limits_cores()
   ##### Generate toy example data
   set.seed(123)
   r = 2
@@ -89,5 +90,4 @@ test_that("ecca.cv parallelization works", {
   expect_equal(dim(result$U)[2], r)
   expect_equal(dim(result$V)[2], r)
 })
-
 

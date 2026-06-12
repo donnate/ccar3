@@ -38,6 +38,7 @@ test_that("cca_graph_rrr_cv returns correct output structure", {
 
 test_that("cca_graph_rrr_cv can run in parallel", {
   skip_if_not_installed("igraph")
+  skip_if_cran_limits_cores()
 
   r = 2
   gen = generate_example_graph(n=500, p1=10, p2=5, 
@@ -62,6 +63,7 @@ test_that("cca_graph_rrr_cv can run in parallel", {
 
 test_that("cca_graph_rrr_cv returns the correct answer", {
   skip_if_not_installed("igraph")
+  skip_if_cran_limits_cores()
 
   
   ##### Generate toy example data

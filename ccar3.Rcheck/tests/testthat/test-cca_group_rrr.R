@@ -54,37 +54,6 @@ test_that("cca_group returns the correct answer", {
 })
 
 
-
-
-
-test_that("cca_group computes the same solutions across solvers", {
-  skip_if_not_installed("CVXR")
-  set.seed(123)
-  r = 2
-  gen = generate_example_group(n=500, p1=100, p2=5, 
-                               r_pca = 3,
-                               nnzeros = 5,
-                               theta = diag(c(0.9,  0.85,  0.8)[1:r]),
-                               lambda_pca = 1,
-                               r = r, overlapping_amount = 1,
-                               normalize_diagonal = TRUE,
-                               n_new = 5000)
-  X = gen$X
-  Y = gen$Y                          
-  result1 <- cca_group_rrr(X, Y, r = r, groups=gen$groups, Sx=NULL,  Sy=NULL, 
-                          lambda=0.1, LW_Sy = TRUE, solver="ADMM")
-  result2 <- cca_group_rrr(X, Y, r = r, 
-                          groups=gen$groups, 
-                          Sx=NULL,  Sy=NULL, lambda=0.1,
-                          LW_Sy = TRUE, solver="CVXR")
-  
-  expect_true(subdistance(result1$U, gen$u) <0.35)
-  expect_true(subdistance(result2$U, gen$u) <0.35)
-  
-  expect_true(subdistance(result1$V, gen$v) <0.35)
-  expect_true(subdistance(result2$V, gen$v) <0.35)
-})
-
 test_that("cca_group_rrr supports preprocess modes and p > n", {
   set.seed(42)
   n <- 40

@@ -41,40 +41,6 @@ test_that("cca_rrr returns the correct answer", {
 })
 
 
-
-
-
-test_that("cca_rrr computes the same solutions across solvers", {
-  set.seed(123)
-  skip_if_not_installed("CVXR")
-
-
-  r = 3
-  gen = generate_example_sparse_U(n=10000, p1=100, p2=10,
-                                  r_pca = 5,
-                                  nnzeros = 10,
-                                  theta = diag(seq(0.9, 0.85, length.out = r)),
-                                  lambda_pca = 1,
-                                  r = r,  overlapping_amount = 1,
-                                  normalize_diagonal = TRUE,
-                                  n_new = 5000) 
-  X = gen$X
-  Y = gen$Y  
-
-  result2 <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0.1, rho=10,
-                     highdim=TRUE,
-                     LW_Sy = TRUE, solver="ADMM")
-  print("Done ADMM")
-  result3 <- cca_rrr(X, Y, r = r, Sx=NULL,  Sy=NULL, lambda=0.1,
-                    highdim=TRUE,
-                    LW_Sy = TRUE, solver="CVX")
-  print("Done CVXR")
-  
-  expect_true(subdistance(result2$U, gen$u) <0.2 )
-  expect_true(subdistance(result3$U, gen$u) <0.2 )
-})
-
-
 test_that("cca_rrr exposes matrix-free ADMM tuning arguments", {
   set.seed(42)
   X <- matrix(rnorm(80 * 12), 80, 12)

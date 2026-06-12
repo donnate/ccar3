@@ -625,6 +625,7 @@ cca_graph_rrr_cv <- function(X, Y, Gamma,
         nb_cores_effective <- min(as.integer(nb_cores), kfolds, length(lambdas))
       }
       nb_cores_effective <- max(1L, nb_cores_effective)
+      nb_cores_effective <- .limit_parallel_cores(nb_cores_effective)
       cl <- setup_parallel_backend(nb_cores_effective)
       
       if (!is.null(cl)) {
