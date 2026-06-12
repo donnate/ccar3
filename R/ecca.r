@@ -1251,6 +1251,7 @@ ecca.cv <- function(
   out <- list(
     U = fit$U,
     V = fit$V,
+    Bhat = fit$Bhat,
     cor = fit$cor,
     loss = fit$loss,
     lambda.opt = lambda.opt
